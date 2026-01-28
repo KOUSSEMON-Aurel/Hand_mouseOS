@@ -26,6 +26,8 @@ class HandEngine:
             min_tracking_confidence=0.5)
         
         self.landmarker = vision.HandLandmarker.create_from_options(options)
+        self.last_timestamp_ms = 0
+        self.prev_fps_time = 0
         # ---------------------
 
     def start(self):
@@ -63,8 +65,18 @@ class HandEngine:
             # 2. Create MP Image
             mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_rgb)
             
+            # FPS Calculation
+            curr_time = time.time()
+            fps = 1 / (curr_time - self.prev_fps_time) if (curr_time - self.prev_fps_time) > 0 else 0
+            self.prev_fps_time = curr_time
+            cv2.putText(img, f"FPS: {int(fps)}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            
             # 3. Detect (Video Mode requires timestamp)
             timestamp_ms = int((time.time() - start_time) * 1000)
+            if timestamp_ms <= self.last_timestamp_ms:
+                timestamp_ms = self.last_timestamp_ms + 1
+            self.last_timestamp_ms = timestamp_ms
+            
             detection_result = self.landmarker.detect_for_video(mp_image, timestamp_ms)
 
             # 4. Process Results
@@ -72,66 +84,62 @@ class HandEngine:
                 if len(detection_result.hand_landmarks) > 0:
                      pass # print("DEBUG: Hand Found")
                 
-                # We only asked for 1 hand
-                hand_lms = detection_result.hand_landmarks[0]
-                
-                # Convert NormalizedLandmark (0.0-1.0) to Pixels
-                lm_list = []
-                for lm in hand_lms:
-                    px, py = int(lm.x * w), int(lm.y * h)
-                    lm_list.append([px, py])
+                for hand_landmarks in detection_result.hand_landmarks:
+                    # Draw connections (Skeleton)
+                    # MediaPipe Hand Connections indices
+                    CONNECTIONS = frozenset([
+                        (0, 1), (1, 2), (2, 3), (3, 4),
+                        (0, 5), (5, 6), (6, 7), (7, 8),
+                        (5, 9), (9, 10), (10, 11), (11, 12),
+                        (9, 13), (13, 14), (14, 15), (15, 16),
+                        (13, 17), (17, 18), (18, 19), (19, 20),
+                        (0, 17)
+                    ])
+                    
+                    lm_list = []
+                    for i, lm in enumerate(hand_landmarks):
+                        # Convert normalized to pixel coordinates
+                        px, py = int(lm.x * w), int(lm.y * h)
+                        lm_list.append((px, py))
+                        
+                        # Draw landmark points
+                        cv2.circle(img, (px, py), 3, (0, 255, 255), cv2.FILLED) # Yellow points
 
-                # Draw Hand (Simple Skeleton manually since solutions.drawing_utils is gone)
-                # Wrist(0) -> Thumb(1-4) | Index(5-8) | Middle(9-12) | Ring(13-16) | Pinky(17-20)
-                connections = [
-                    (0,1),(1,2),(2,3),(3,4),
-                    (0,5),(5,6),(6,7),(7,8),
-                    (5,9),(9,10),(10,11),(11,12),
-                    (9,13),(13,14),(14,15),(15,16),
-                    (13,17),(17,18),(18,19),(19,20),
-                    (0,17)
-                ]
-                for p1_idx, p2_idx in connections:
-                     cv2.line(img, tuple(lm_list[p1_idx]), tuple(lm_list[p2_idx]), (200, 200, 200), 2)
-                for pt in lm_list:
-                    cv2.circle(img, (pt[0], pt[1]), 3, (255, 0, 0), cv2.FILLED)
+                    # Draw lines
+                    for start_idx, end_idx in CONNECTIONS:
+                         if start_idx < len(lm_list) and end_idx < len(lm_list):
+                             cv2.line(img, lm_list[start_idx], lm_list[end_idx], (0, 255, 0), 2) # Green lines
 
-                # Logic
-                if len(lm_list) > 12:
-                    x1, y1 = lm_list[8] # Index Tip
-                    x2, y2 = lm_list[4] # Thumb Tip
-                    
-                    # Distance for Click
-                    distance = self._get_distance(lm_list[8], lm_list[4])
-                    
-                    # Pass timestamp (in seconds) to driver for OneEuroFilter
-                    ts_seconds = timestamp_ms / 1000.0
-                    
-                    if distance < 40: # Click
-                        cv2.circle(img, (x1, y1), 15, (0, 255, 0), cv2.FILLED)
-                        self.mouse.click()
-                    else: # Move
-                        cv2.circle(img, (x1, y1), 15, (255, 0, 255), cv2.FILLED)
-                        self.mouse.move(x1, y1, w, h, timestamp=ts_seconds)
+                    # Logic for Mouse (using the first hand found)
+                    if len(lm_list) > 12:
+                        x1, y1 = lm_list[8] # Index Tip
+                        x2, y2 = lm_list[4] # Thumb Tip
+                        
+                        # Distance for Click
+                        distance = self._get_distance(lm_list[8], lm_list[4])
+                        
+                        # Pass timestamp (in seconds) to driver for OneEuroFilter
+                        ts_seconds = timestamp_ms / 1000.0
+                        
+                        # Draw Interaction Info
+                        cv2.line(img, (x1, y1), (x2, y2), (255, 0, 0), 2) # Line between Thumb and Index
+                        
+                        if distance < 40: # Click
+                            cv2.circle(img, (x1, y1), 10, (0, 0, 255), cv2.FILLED) # Red Click Indicator
+                            cv2.putText(img, "CLICK", (x1 + 20, y1), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                            self.mouse.click()
+                        else: # Move
+                            self.mouse.move(x1, y1, w, h, timestamp=ts_seconds)
 
             # 5. Send Frame to GUI (if callback exists)
             if self.on_frame_callback:
-                # Convert back to BGR for encoding (or keep RGB if Flet supports it? Flet src_base64 expects standard image formats like JPG/PNG)
-                # OpenCV uses BGR.
-                # Draw landmarks on 'img' which is BGR.
-                
-                # Encode via JPEG (faster than PNG)
                 success_enc, buffer = cv2.imencode('.jpg', img)
                 if success_enc:
                     import base64
                     b64_str = base64.b64encode(buffer).decode('utf-8')
                     self.on_frame_callback(b64_str)
-
-            # cv2.imshow("Hand_mouseOS Vision", img)
-            # if cv2.waitKey(1) & 0xFF == ord('q'):
-            #    self.stop()
                 
-            time.sleep(0.005)
+            time.sleep(0.001) # Reduce sleep for smoother 30/60fps
         
         self.cap.release()
         cv2.destroyAllWindows()
