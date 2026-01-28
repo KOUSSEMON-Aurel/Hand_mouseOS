@@ -13,11 +13,10 @@ class AppGUI:
         # self.page.bgcolor = "#0b0f14" # Dark background from AppShell
 
         self.img_control = ft.Image(
-            src="",
+            src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
             width=640,
             height=480,
             fit="contain",
-            # gapless_playback=True, # Removed, might not check if it exists but src_base64 is gone.
         )
         
         # Engine setup with callback
@@ -91,16 +90,16 @@ class AppGUI:
 
     def build_live_view(self):
         # Controls
-        btn_start = ft.ElevatedButton(
+        self.btn_start = ft.ElevatedButton(
             content=ft.Text("Start System"),
             icon=ft.Icons.PLAY_ARROW,
-            on_click=lambda e: self.toggle_engine(e, btn_start)
+            on_click=lambda e: self.toggle_engine(e)
         )
         
         if self.engine.running:
-             btn_start.content = ft.Text("Stop System")
-             btn_start.icon = ft.Icons.STOP
-             btn_start.bgcolor = ft.Colors.RED_400
+             self.btn_start.content = ft.Text("Stop System")
+             self.btn_start.icon = ft.Icons.STOP
+             self.btn_start.bgcolor = ft.Colors.RED_400
 
         self.content_area.controls.extend([
             ft.Text("Camera Feed (Internal)", size=24, weight=ft.FontWeight.BOLD),
@@ -112,7 +111,7 @@ class AppGUI:
                 bgcolor=ft.Colors.BLACK,
             ),
             ft.Container(height=20),
-            btn_start,
+            self.btn_start,
             ft.Text("Status: " + ("Running" if self.engine.running else "Stopped"), italic=True)
         ])
 
@@ -135,20 +134,19 @@ class AppGUI:
             ft.Text("One Euro Filter Active", color=ft.Colors.GREEN_400)
         ])
 
-    def toggle_engine(self, e, btn):
+    def toggle_engine(self, e):
         if self.engine.running:
             self.engine.stop()
-            btn.content = ft.Text("Start System")
-            btn.icon = ft.Icons.PLAY_ARROW
-            btn.bgcolor = None 
+            self.btn_start.content = ft.Text("Start System")
+            self.btn_start.icon = ft.Icons.PLAY_ARROW
+            self.btn_start.bgcolor = None 
         else:
             self.engine.start()
-            btn.content = ft.Text("Stop System")
-            btn.icon = ft.Icons.STOP
-            btn.bgcolor = ft.Colors.RED_400
+            self.btn_start.content = ft.Text("Stop System")
+            self.btn_start.icon = ft.Icons.STOP
+            self.btn_start.bgcolor = ft.Colors.RED_400
         
-        # Refresh view
-        self.on_nav_change(type('obj', (object,), {'control': type('obj', (object,), {'selected_index': 0})})()) 
+        self.btn_start.update() 
 
 def main(page: ft.Page):
     app = AppGUI(page)
