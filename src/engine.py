@@ -100,12 +100,15 @@ class HandEngine:
                     # Distance for Click
                     distance = self._get_distance(lm_list[8], lm_list[4])
                     
+                    # Pass timestamp (in seconds) to driver for OneEuroFilter
+                    ts_seconds = timestamp_ms / 1000.0
+                    
                     if distance < 40: # Click
                         cv2.circle(img, (x1, y1), 15, (0, 255, 0), cv2.FILLED)
                         self.mouse.click()
                     else: # Move
                         cv2.circle(img, (x1, y1), 15, (255, 0, 255), cv2.FILLED)
-                        self.mouse.move(x1, y1, w, h)
+                        self.mouse.move(x1, y1, w, h, timestamp=ts_seconds)
 
             # Show preview window (optional, can be disabled or embedded)
             cv2.imshow("Hand_mouseOS Vision", img)

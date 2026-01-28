@@ -1,69 +1,95 @@
-import pyautogui
-import numpy as np
 import time
+try:
+    import uinput
+    UINPUT_AVAILABLE = True
+except ImportError:
+    UINPUT_AVAILABLE = False
+    print("Warning: python-uinput not found. Falling back to PyAutoGUI (slower).")
+
+import pyautogui
+from one_euro_filter import OneEuroFilter
 
 class MouseDriver:
-    def __init__(self, smoothing_factor=5, sensitivity=1.0):
-        """
-        Initialize the Mouse Driver.
-        :param smoothing_factor: Higher value = smoother but more lag (1-10 recommended).
-        :param sensitivity: Multiplier for mouse movement speed.
-        """
-        pyautogui.FAILSAFE = False
-        self.screen_w, self.screen_h = pyautogui.size()
-        self.smoothing = smoothing_factor
-        self.sensitivity = sensitivity
+    def __init__(self, screen_w=1920, screen_h=1080):
+        self.sw, self.sh = pyautogui.size()
+        self.mode = "pyautogui"
+        self.device = None
         
-        # State for smoothing
-        self.prev_x, self.prev_y = 0, 0
-        self.curr_x, self.curr_y = 0, 0
+        # --- One Euro Filter Setup ---
+        # Tuned parameters for hand tracking
+        # min_cutoff: 0.05 (very smooth at low speed) to 1.0 (very responsive)
+        # beta: speed coefficient (0 = no adaptive, 0.001+ = adaptive)
+        self.filter_x = OneEuroFilter(t0=time.time(), x0=0, min_cutoff=0.1, beta=0.005)
+        self.filter_y = OneEuroFilter(t0=time.time(), x0=0, min_cutoff=0.1, beta=0.005)
         
-        # Click state to avoid spamming clicks
+        # --- UInput Setup ---
+        if UINPUT_AVAILABLE:
+            try:
+                events = (
+                    uinput.BTN_LEFT,
+                    uinput.BTN_RIGHT,
+                    uinput.ABS_X + (0, self.sw, 0, 0),
+                    uinput.ABS_Y + (0, self.sh, 0, 0),
+                )
+                self.device = uinput.Device(events)
+                self.mode = "uinput"
+                print("MouseDriver: Using UINPUT (Kernel Level) - Maximum Performance")
+            except Exception as e:
+                print(f"MouseDriver: UInput failed ({e}). Falling back to PyAutoGUI.")
+                self.mode = "pyautogui"
+        
+        if self.mode == "pyautogui":
+            pyautogui.FAILSAFE = False
+            pyautogui.PAUSE = 0 # Turbo Mode
+            print("MouseDriver: Using PyAutoGUI")
+
         self.last_click_time = 0
-        self.click_cooldown = 0.5 # Seconds
 
-    def move(self, x_rel, y_rel, frame_w, frame_h):
+    def set_smoothing(self, value):
+        # Value 1-20 from slider.
+        # We assume value 1 = very responsive (min_cutoff high), value 20 = very smooth (min_cutoff low)
+        # Mapping: 1 -> 1.0 Hz, 20 -> 0.01 Hz
+        
+        # mc = 1.0 / value (approx)
+        mc = 1.0 / max(1, value * 0.5) 
+        self.filter_x.min_cutoff = mc
+        self.filter_y.min_cutoff = mc
+
+    def move(self, x, y, frame_w, frame_h, timestamp=None):
         """
-        Move the mouse based on relative coordinates from the camera frame.
-        x_rel, y_rel: Coordinates in the camera frame (0 to frame_w/h).
+        x, y: Coordinates in the camera frame (pixels)
+        frame_w, frame_h: Dimensions of the camera frame
+        timestamp: Time in seconds (float) associated with the frame
         """
-        # 1. Normalize coordinates (0.0 to 1.0)
-        x_norm = np.interp(x_rel, (0, frame_w), (0, 1))
-        y_norm = np.interp(y_rel, (0, frame_h), (0, 1))
+        if timestamp is None:
+            timestamp = time.time()
 
-        # 2. Map to Screen Coordinates
-        # Use a localized box for better reach (optional, here we map full screen)
-        # To make it usable, we often map a smaller center box of the cam to full screen
-        cam_margin = 100 # Pixels from edge of camera frame to ignore
+        # 1. Filter raw input
+        # Use try/except just in case init failed subtly, though __init__ should cover it
+        x_filtered = self.filter_x(timestamp, x)
+        y_filtered = self.filter_y(timestamp, y)
+
+        # 2. Map to Screen
+        screen_x = int( (x_filtered / frame_w) * self.sw )
+        screen_y = int( (y_filtered / frame_h) * self.sh )
         
-        x_screen = np.interp(x_rel, (cam_margin, frame_w - cam_margin), (0, self.screen_w))
-        y_screen = np.interp(y_rel, (cam_margin, frame_h - cam_margin), (0, self.screen_h))
-
-        # 3. Smoothing (Exponential Moving Average)
-        self.curr_x = self.prev_x + (x_screen - self.prev_x) / self.smoothing
-        self.curr_y = self.prev_y + (y_screen - self.prev_y) / self.smoothing
-
-        # 4. Apply Sensitivity (Simple clamp or multiplier if delta based, but here we use absolute mapping)
-        # For absolute mapping, sensitivity is usually adjusting the mapped area size.
-        # We'll stick to the mapped area approach above.
-
-        # 5. Move Mouse
-        # Clamp to screen size
-        final_x = max(0, min(self.screen_w, self.curr_x))
-        final_y = max(0, min(self.screen_h, self.curr_y))
+        # Clamp
+        screen_x = max(0, min(self.sw - 1, screen_x))
+        screen_y = max(0, min(self.sh - 1, screen_y))
         
-        pyautogui.moveTo(final_x, final_y)
-        
-        self.prev_x, self.prev_y = self.curr_x, self.curr_y
+        # 3. Apply
+        if self.mode == "uinput" and self.device:
+            self.device.emit(uinput.ABS_X, screen_x, syn=False)
+            self.device.emit(uinput.ABS_Y, screen_y)
+        else:
+            pyautogui.moveTo(screen_x, screen_y)
 
     def click(self):
-        """Perform a left click with cooldown."""
-        if time.time() - self.last_click_time > self.click_cooldown:
-            pyautogui.click()
-            self.last_click_time = time.time()
-            return True
-        return False
-        
-    def set_smoothing(self, factor):
-        self.smoothing = max(1, factor)
-
+        now = time.time()
+        if now - self.last_click_time > 0.3: # Debounce
+            if self.mode == "uinput" and self.device:
+                self.device.emit(uinput.BTN_LEFT, 1)
+                self.device.emit(uinput.BTN_LEFT, 0)
+            else:
+                pyautogui.click()
+            self.last_click_time = now
