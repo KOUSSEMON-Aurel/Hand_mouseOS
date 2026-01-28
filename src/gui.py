@@ -13,11 +13,11 @@ class AppGUI:
         # self.page.bgcolor = "#0b0f14" # Dark background from AppShell
 
         self.img_control = ft.Image(
-            src_base64=None,
+            src="",
             width=640,
             height=480,
-            fit=ft.ImageFit.CONTAIN,
-            gapless_playback=True,
+            fit="contain",
+            # gapless_playback=True, # Removed, might not check if it exists but src_base64 is gone.
         )
         
         # Engine setup with callback
@@ -26,7 +26,7 @@ class AppGUI:
         self.setup_ui()
 
     def on_frame(self, b64_str):
-        self.img_control.src_base64 = b64_str
+        self.img_control.src = f"data:image/jpeg;base64,{b64_str}"
         self.img_control.update()
 
     def setup_ui(self):
