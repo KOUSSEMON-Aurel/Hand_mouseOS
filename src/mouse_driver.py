@@ -12,6 +12,7 @@ from one_euro_filter import OneEuroFilter
 class MouseDriver:
     def __init__(self, screen_w=1920, screen_h=1080):
         self.sw, self.sh = pyautogui.size()
+        print(f"DEBUG: Screen size detected: {self.sw}x{self.sh}")
         self.mode = "pyautogui"
         self.device = None
         
@@ -19,8 +20,10 @@ class MouseDriver:
         # Tuned parameters for hand tracking
         # min_cutoff: 0.05 (very smooth at low speed) to 1.0 (very responsive)
         # beta: speed coefficient (0 = no adaptive, 0.001+ = adaptive)
-        self.filter_x = OneEuroFilter(t0=time.time(), x0=0, min_cutoff=0.1, beta=0.005)
-        self.filter_y = OneEuroFilter(t0=time.time(), x0=0, min_cutoff=0.1, beta=0.005)
+        # Fix: Init t0 to 0 (or close to 0) because engine sends relative timestamp (since start)
+        # using time.time() here while engine used (time.time() - start) caused massive negative delta
+        self.filter_x = OneEuroFilter(t0=0, x0=0, min_cutoff=0.1, beta=0.005)
+        self.filter_y = OneEuroFilter(t0=0, x0=0, min_cutoff=0.1, beta=0.005)
         
         # --- UInput Setup ---
         if UINPUT_AVAILABLE:
@@ -78,6 +81,7 @@ class MouseDriver:
         screen_y = max(0, min(self.sh - 1, screen_y))
         
         # 3. Apply
+        # print(f"DEBUG: Move to {screen_x}, {screen_y} (Mode: {self.mode})") 
         if self.mode == "uinput" and self.device:
             self.device.emit(uinput.ABS_X, screen_x, syn=False)
             self.device.emit(uinput.ABS_Y, screen_y)

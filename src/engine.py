@@ -9,9 +9,10 @@ import os
 from mouse_driver import MouseDriver
 
 class HandEngine:
-    def __init__(self):
+    def __init__(self, on_frame_callback=None):
         self.cap = None
         self.running = False
+        self.on_frame_callback = on_frame_callback
         self.mouse = MouseDriver()
         
         # --- NEW API SETUP ---
@@ -68,6 +69,9 @@ class HandEngine:
 
             # 4. Process Results
             if detection_result.hand_landmarks:
+                if len(detection_result.hand_landmarks) > 0:
+                     pass # print("DEBUG: Hand Found")
+                
                 # We only asked for 1 hand
                 hand_lms = detection_result.hand_landmarks[0]
                 
@@ -110,10 +114,22 @@ class HandEngine:
                         cv2.circle(img, (x1, y1), 15, (255, 0, 255), cv2.FILLED)
                         self.mouse.move(x1, y1, w, h, timestamp=ts_seconds)
 
-            # Show preview window (optional, can be disabled or embedded)
-            cv2.imshow("Hand_mouseOS Vision", img)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                self.stop()
+            # 5. Send Frame to GUI (if callback exists)
+            if self.on_frame_callback:
+                # Convert back to BGR for encoding (or keep RGB if Flet supports it? Flet src_base64 expects standard image formats like JPG/PNG)
+                # OpenCV uses BGR.
+                # Draw landmarks on 'img' which is BGR.
+                
+                # Encode via JPEG (faster than PNG)
+                success_enc, buffer = cv2.imencode('.jpg', img)
+                if success_enc:
+                    import base64
+                    b64_str = base64.b64encode(buffer).decode('utf-8')
+                    self.on_frame_callback(b64_str)
+
+            # cv2.imshow("Hand_mouseOS Vision", img)
+            # if cv2.waitKey(1) & 0xFF == ord('q'):
+            #    self.stop()
                 
             time.sleep(0.005)
         

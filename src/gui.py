@@ -1,88 +1,157 @@
 import flet as ft
+from engine import HandEngine
+import base64
 
 class AppGUI:
-    def __init__(self, engine):
-        self.engine = engine
-        self.page = None
-
-    def main(self, page: ft.Page):
+    def __init__(self, page: ft.Page):
         self.page = page
-        page.title = "Hand_mouseOS"
-        page.theme_mode = ft.ThemeMode.DARK
-        page.window_width = 400
-        page.window_height = 600
-        page.window_resizable = False
-        page.vertical_alignment = ft.MainAxisAlignment.CENTER
-        page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+        self.page.title = "Hand_mouseOS"
+        self.page.theme_mode = ft.ThemeMode.DARK
+        self.page.padding = 0
+        self.page.window_width = 1200
+        self.page.window_height = 800
+        # self.page.bgcolor = "#0b0f14" # Dark background from AppShell
 
-        # --- Controls ---
+        self.img_control = ft.Image(
+            src_base64=None,
+            width=640,
+            height=480,
+            fit=ft.ImageFit.CONTAIN,
+            gapless_playback=True,
+        )
         
-        self.status_text = ft.Text("Status: Stopped", color=ft.Colors.RED_400, size=16)
+        # Engine setup with callback
+        self.engine = HandEngine(on_frame_callback=self.on_frame)
         
-        def toggle_engine(e):
-            if self.engine.running:
-                self.engine.stop()
-                btn_start.content = ft.Text("Start Camera")
-                btn_start.icon = ft.Icons.PLAY_ARROW
-                self.status_text.value = "Status: Stopped"
-                self.status_text.color = ft.Colors.RED_400
-            else:
-                self.engine.start()
-                btn_start.content = ft.Text("Stop Camera")
-                btn_start.icon = ft.Icons.STOP
-                self.status_text.value = "Status: Running"
-                self.status_text.color = ft.Colors.GREEN_400
-            page.update()
+        self.setup_ui()
 
+    def on_frame(self, b64_str):
+        self.img_control.src_base64 = b64_str
+        self.img_control.update()
+
+    def setup_ui(self):
+        # --- Sidebar ---
+        rail = ft.NavigationRail(
+            selected_index=0,
+            label_type=ft.NavigationRailLabelType.ALL,
+            min_width=100,
+            min_extended_width=400,
+            # bgcolor="#151a21", # Sidebar color
+            group_alignment=-0.9,
+            destinations=[
+                ft.NavigationRailDestination(
+                    icon=ft.Icons.VIDEOCAM_OUTLINED, 
+                    selected_icon=ft.Icons.VIDEOCAM, 
+                    label="Live View"
+                ),
+                ft.NavigationRailDestination(
+                    icon=ft.Icons.GESTURE, 
+                    selected_icon=ft.Icons.GESTURE, 
+                    label="Gestures"
+                ),
+                ft.NavigationRailDestination(
+                    icon=ft.Icons.SETTINGS_OUTLINED, 
+                    selected_icon=ft.Icons.SETTINGS, 
+                    label="Settings"
+                ),
+            ],
+            on_change=self.on_nav_change
+        )
+
+        # --- Content Area ---
+        self.content_area = ft.Column(expand=True, alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+        
+        # Initial Content (Live View)
+        self.build_live_view()
+
+        # --- Main Layout ---
+        layout = ft.Row(
+            [
+                rail,
+                ft.VerticalDivider(width=1),
+                self.content_area,
+            ],
+            expand=True,
+        )
+
+        self.page.add(layout)
+    
+    def on_nav_change(self, e):
+        idx = e.control.selected_index
+        self.content_area.controls.clear()
+        
+        if idx == 0:
+            self.build_live_view()
+        elif idx == 1:
+            self.content_area.controls.append(ft.Text("Gestures Config (Coming Soon)", size=30))
+        elif idx == 2:
+            self.build_settings_view()
+        
+        self.content_area.update()
+
+    def build_live_view(self):
+        # Controls
+        btn_start = ft.ElevatedButton(
+            content=ft.Text("Start System"),
+            icon=ft.Icons.PLAY_ARROW,
+            on_click=lambda e: self.toggle_engine(e, btn_start)
+        )
+        
+        if self.engine.running:
+             btn_start.content = ft.Text("Stop System")
+             btn_start.icon = ft.Icons.STOP
+             btn_start.bgcolor = ft.Colors.RED_400
+
+        self.content_area.controls.extend([
+            ft.Text("Camera Feed (Internal)", size=24, weight=ft.FontWeight.BOLD),
+            ft.Container(
+                content=self.img_control,
+                border=ft.border.all(2, ft.Colors.BLUE_GREY_100),
+                border_radius=10,
+                padding=5,
+                bgcolor=ft.Colors.BLACK,
+            ),
+            ft.Container(height=20),
+            btn_start,
+            ft.Text("Status: " + ("Running" if self.engine.running else "Stopped"), italic=True)
+        ])
+
+    def build_settings_view(self):
         def on_smooth_change(e):
             val = int(e.control.value)
-            self.engine.set_smoothing(val)
-            lbl_smooth.value = f"Smoothing: {val}"
-            page.update()
+            self.engine.mouse.set_smoothing(val)
+            lbl.value = f"Smoothing Factor: {val}"
+            self.page.update()
 
-        btn_start = ft.ElevatedButton(
-            content=ft.Text("Start Camera"),
-            icon=ft.Icons.PLAY_ARROW,
-            style=ft.ButtonStyle(
-                shape=ft.RoundedRectangleBorder(radius=10),
-                padding=20,
-            ),
-            on_click=toggle_engine
-        )
+        slider = ft.Slider(min=1, max=20, divisions=19, value=5, label="{value}", on_change=on_smooth_change)
+        lbl = ft.Text("Smoothing Factor: 5")
 
-        slider_smooth = ft.Slider(
-            min=1, max=20, divisions=19, value=5, label="{value}",
-            on_change=on_smooth_change
-        )
-        lbl_smooth = ft.Text("Smoothing: 5")
+        self.content_area.controls.extend([
+            ft.Text("Settings", size=30, weight=ft.FontWeight.BOLD),
+            ft.Container(height=20),
+            lbl,
+            slider,
+            ft.Container(height=20),
+            ft.Text("One Euro Filter Active", color=ft.Colors.GREEN_400)
+        ])
 
-        # --- Layout ---
+    def toggle_engine(self, e, btn):
+        if self.engine.running:
+            self.engine.stop()
+            btn.content = ft.Text("Start System")
+            btn.icon = ft.Icons.PLAY_ARROW
+            btn.bgcolor = None 
+        else:
+            self.engine.start()
+            btn.content = ft.Text("Stop System")
+            btn.icon = ft.Icons.STOP
+            btn.bgcolor = ft.Colors.RED_400
         
-        container = ft.Container(
-            content=ft.Column(
-                [
-                    ft.Icon(ft.Icons.MOUSE, size=64, color=ft.Colors.BLUE_400),
-                    ft.Text("Hand_mouseOS", size=32, weight=ft.FontWeight.BOLD),
-                    ft.Divider(height=20, thickness=1),
-                    self.status_text,
-                    ft.Container(height=20),
-                    btn_start,
-                    ft.Container(height=40),
-                    ft.Text("Settings", size=20, weight=ft.FontWeight.BOLD),
-                    lbl_smooth,
-                    slider_smooth,
-                    ft.Text("Tips: Pinch to Click, Index Up to Move", size=12, italic=True, color=ft.Colors.GREY_500),
-                ],
-                alignment=ft.MainAxisAlignment.CENTER,
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            ),
-            padding=30,
-            border_radius=20,
-            bgcolor=ft.Colors.SURFACE_CONTAINER,
-            width=320,
-            height=500,
-            animate=ft.Animation(500, ft.AnimationCurve.BOUNCE_OUT),
-        )
+        # Refresh view
+        self.on_nav_change(type('obj', (object,), {'control': type('obj', (object,), {'selected_index': 0})})()) 
 
-        page.add(container)
+def main(page: ft.Page):
+    app = AppGUI(page)
 
+if __name__ == "__main__":
+    ft.app(target=main)
