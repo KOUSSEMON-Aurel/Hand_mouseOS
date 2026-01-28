@@ -19,8 +19,8 @@ class AppGUI:
             fit="contain",
         )
         
-        # Engine setup with callback
-        self.engine = HandEngine(on_frame_callback=self.on_frame)
+        # Engine setup
+        self.engine = HandEngine()
         
         self.setup_ui()
 
@@ -76,14 +76,12 @@ class AppGUI:
         self.page.add(layout)
     
     def on_nav_change(self, e):
-        idx = e.control.selected_index
         self.content_area.controls.clear()
-        
-        if idx == 0:
+        if e.control.selected_index == 0:
             self.build_live_view()
-        elif idx == 1:
+        elif e.control.selected_index == 1:
             self.content_area.controls.append(ft.Text("Gestures Config (Coming Soon)", size=30))
-        elif idx == 2:
+        elif e.control.selected_index == 2:
             self.build_settings_view()
         
         self.content_area.update()
@@ -102,17 +100,25 @@ class AppGUI:
              self.btn_start.bgcolor = ft.Colors.RED_400
 
         self.content_area.controls.extend([
-            ft.Text("Camera Feed (Internal)", size=24, weight=ft.FontWeight.BOLD),
-            ft.Container(
-                content=self.img_control,
-                border=ft.border.all(2, ft.Colors.BLUE_GREY_100),
-                border_radius=10,
-                padding=5,
-                bgcolor=ft.Colors.BLACK,
-            ),
+            ft.Text("Hand Mouse Control", size=30, weight=ft.FontWeight.BOLD),
+            ft.Text("Camera feed opens in a separate native window for zero-latency performance.", italic=True),
             ft.Container(height=20),
-            self.btn_start,
-            ft.Text("Status: " + ("Running" if self.engine.running else "Stopped"), italic=True)
+            ft.Card(
+                content=ft.Container(
+                    content=ft.Column(
+                        [
+                            ft.Icon(ft.Icons.VIDEOCAM_OUTLINED, size=50, color=ft.Colors.GREEN),
+                            ft.Text("Video Engine Status", size=20, weight=ft.FontWeight.BOLD),
+                            self.btn_start,
+                            ft.Text("Press 'q' in the video window to stop", size=12, color=ft.Colors.GREY_500)
+                        ],
+                        alignment=ft.MainAxisAlignment.CENTER,
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                        spacing=20
+                    ),
+                    padding=40,
+                )
+            )
         ])
 
     def build_settings_view(self):
