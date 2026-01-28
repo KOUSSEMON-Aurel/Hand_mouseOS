@@ -94,7 +94,7 @@ class AppGUI:
             on_click=lambda e: self.toggle_engine(e)
         )
         
-        if self.engine.running:
+        if self.engine.is_processing:
              self.btn_start.content = ft.Text("Stop System")
              self.btn_start.icon = ft.Icons.STOP
              self.btn_start.bgcolor = ft.Colors.RED_400
@@ -141,16 +141,16 @@ class AppGUI:
         ])
 
     def toggle_engine(self, e):
-        if self.engine.running:
-            self.engine.stop()
-            self.btn_start.content = ft.Text("Start System")
-            self.btn_start.icon = ft.Icons.PLAY_ARROW
-            self.btn_start.bgcolor = None 
-        else:
+        if not self.engine.is_processing:
             self.engine.start()
             self.btn_start.content = ft.Text("Stop System")
             self.btn_start.icon = ft.Icons.STOP
             self.btn_start.bgcolor = ft.Colors.RED_400
+        else:
+            self.engine.stop()
+            self.btn_start.content = ft.Text("Start System")
+            self.btn_start.icon = ft.Icons.PLAY_ARROW
+            self.btn_start.bgcolor = ft.Colors.BLUE_400
         
         self.btn_start.update() 
 
