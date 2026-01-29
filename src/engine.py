@@ -233,6 +233,10 @@ class HandEngine:
                      is_pinching = (primary_gesture == "PINCH")
                      self.virtual_keyboard.check_input(index_pos_px, is_pinching)
                  
+                  # --- PHASE 8: ASL RECOGNITION (Geometric - No TF) ---
+                  if self.asl_enabled and primary_hand_landmarks:
+                       lbl, conf = self.sign_interpreter.predict(None, primary_hand_landmarks)
+                       self.last_asl_prediction = f"{lbl} ({conf:.2f})"
              else:
                  # No primary hand detected
                  pass
