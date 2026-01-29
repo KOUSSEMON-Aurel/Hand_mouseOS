@@ -81,10 +81,10 @@ class TestRustIntegration:
     """Tests spécifiques à l'intégration Rust"""
     
     def test_rust_module_available(self):
-        """Vérifie que le module Rust est chargé"""
-        from src.processing.geometry.calculator import RUST_AVAILABLE
+        """Vérifie que le module Numba est chargé"""
+        from src.processing.geometry.calculator import NUMBA_AVAILABLE
         # Ce test passe quel que soit le résultat, juste info
-        print(f"Rust available: {RUST_AVAILABLE}")
+        print(f"Numba available: {NUMBA_AVAILABLE}")
         assert True
     
     def test_rust_distance_performance(self):
