@@ -22,7 +22,7 @@ class FeedbackOverlay:
         "window": (255, 0, 255),    # Magenta
         "media": (0, 255, 0),       # Vert
         "shortcut": (0, 255, 255),  # Jaune
-        "asl": (255, 165, 0),       # Orange pour ASL
+        "asl": (0, 128, 255),       # Orange (BGR: Blue=0, Green=128, Red=255)
     }
     
     # Emojis textuels (car OpenCV ne supporte pas les vrais emojis)

@@ -17,9 +17,8 @@ from src.gesture_classifier import StaticGestureClassifier # Refactored
 from src.context_mode import ContextModeDetector, ContextMode # NEW
 from src.action_dispatcher import ActionDispatcher, ActionType # NEW
 from src.feedback_overlay import FeedbackOverlay # NEW
-from src.feedback_overlay import FeedbackOverlay # NEW
 from src.virtual_keyboard import VirtualKeyboard # PHASE 8
-from src.sign_recognizer import SignLanguageInterpreter # PHASE 8: ASL
+from src.asl_manager import ASLManager # REFACTOR: OOP
 
 class HandEngine:
     def __init__(self, headless=False):
@@ -38,13 +37,12 @@ class HandEngine:
         self.action_dispatcher = ActionDispatcher()
         self.feedback_overlay = FeedbackOverlay(position="top_left")
         self.virtual_keyboard = VirtualKeyboard(layout="azerty", mode="dwell")  # PHASE 8
-        self.sign_interpreter = SignLanguageInterpreter() # PHASE 8: ASL
+        self.asl_manager = ASLManager()
         
         # PHASE 8: Feature Flags (controlled by GUI)
         self.keyboard_enabled = False
-        self.asl_enabled = False
+        # self.asl_enabled is now a property below
         self.mouse_frozen = False  # NEW: Freeze mouse for typing
-        self.last_asl_prediction = "" # Store last prediction
         
         # Gesture detection state for freeze toggle
         self._freeze_gesture_frames = 0
@@ -67,6 +65,14 @@ class HandEngine:
         self.latest_landmarks = None # NEW: For 3D HUD
         self.inference_start_times = {} # Map timestamp_ms -> wall_time
         self.current_gestures = [] # NEW PHASE 4
+
+    @property
+    def asl_enabled(self):
+        return self.asl_manager.enabled
+        
+    @asl_enabled.setter
+    def asl_enabled(self, value):
+        self.asl_manager.set_enabled(value)
         
         # --- NEW API SETUP (GPU Default, Fallback in Loop) ---
         # ATTEMPT GPU
@@ -233,7 +239,7 @@ class HandEngine:
                      is_pinching = (primary_gesture == "PINCH")
                      self.virtual_keyboard.check_input(index_pos_px, is_pinching)
                  
-                 self._process_asl(primary_hand_landmarks)
+                 self.asl_manager.process(primary_hand_landmarks)
              else:
                  # No primary hand detected
                  pass
@@ -516,11 +522,10 @@ class HandEngine:
                     display_action = self.action_dispatcher.get_action_info(local_action)["emoji"] + " " + self.action_dispatcher.get_action_info(local_action)["name"]
                     
                     # Override Display Action if ASL is ON
-                    # Override Display Action if ASL is ON
                     overlay_mode = local_mode.value
                     if self.asl_enabled:
                         overlay_mode = "asl"
-                        display_action = f"SIGNE: {getattr(self, 'last_asl_prediction', 'En attente...')}"
+                        display_action = f"SIGNE: {self.asl_manager.get_display_text()}"
                         
                     img = self.feedback_overlay.draw(
                         frame=img,
@@ -581,8 +586,3 @@ class HandEngine:
     def set_smoothing(self, value):
         self.mouse.set_smoothing(value)
 
-    def _process_asl(self, landmarks):
-        """Helper to process ASL recognition safely."""
-        if self.asl_enabled and landmarks:
-            lbl, conf = self.sign_interpreter.predict(None, landmarks)
-            self.last_asl_prediction = f"{lbl} ({conf:.2f})"
