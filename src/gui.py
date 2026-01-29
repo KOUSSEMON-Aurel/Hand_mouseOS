@@ -66,7 +66,7 @@ class AppGUI:
         if idx == 0:
             self.build_live_view()
         elif idx == 1:
-            self.content_area.controls.append(GesturesView())
+            self.content_area.controls.append(GesturesView(self))
         elif idx == 2:
             self.content_area.controls.append(SettingsView(self))
             
