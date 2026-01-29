@@ -362,11 +362,11 @@ class HandEngine:
                     print("DEBUG: Initializing Camera and Engine...")
                     # Auto-detect camera
                     self.cap = None
-                    for cam_idx in range(5):
-                        print(f"📷 Testing camera index {cam_idx}...")
-                        temp_cap = cv2.VideoCapture(cam_idx)
+                    for cam_idx in range(2):
+                        print(f"📷 Testing camera index {cam_idx} with V4L2...")
+                        temp_cap = cv2.VideoCapture(cam_idx, cv2.CAP_V4L2)
                         if temp_cap.isOpened():
-                            # Try reading a frame to be sure
+                            print(f"   - Index {cam_idx} opened. Reading frame to verify...")
                             ret, _ = temp_cap.read()
                             if ret:
                                 self.cap = temp_cap
