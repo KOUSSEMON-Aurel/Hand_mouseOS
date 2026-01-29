@@ -84,7 +84,9 @@ class ActionDispatcher:
             ("cursor", "TWO_FINGERS", "hold"): ActionType.SCROLL_UP,
             
             ("cursor", "FIST", "quick"): ActionType.CLICK_RIGHT,
-            ("cursor", "PALM", "quick"): ActionType.NONE,  # Pause/Repos
+            ("cursor", "PALM", "quick"): ActionType.MOVE_CURSOR,  # Allow PALM to move cursor too (Usability)
+            ("cursor", "PALM", "hold"): ActionType.MOVE_CURSOR,
+            ("cursor", "PALM", "long"): ActionType.MOVE_CURSOR,
             
             # ==================== MODE WINDOW ====================
             ("window", "POINTING", "quick"): ActionType.SNAP_LEFT,  # Dépend du bord

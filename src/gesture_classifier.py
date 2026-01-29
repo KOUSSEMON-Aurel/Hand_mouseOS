@@ -82,10 +82,10 @@ class StaticGestureClassifier:
     
     def _is_pinching(self, landmarks) -> bool:
         """Détecte si le pouce et l'index sont joints (pincement)."""
+        # Note: Rust disabled temporarily - needs threshold calibration
         thumb_tip = landmarks[4]
         index_tip = landmarks[8]
         
-        # Distance euclidienne normalisée
         dx = thumb_tip.x - index_tip.x
         dy = thumb_tip.y - index_tip.y
         dz = getattr(thumb_tip, 'z', 0) - getattr(index_tip, 'z', 0)
