@@ -1,6 +1,6 @@
 import numpy as np
 import cv2
-from one_euro_filter import OneEuroFilter
+from src.one_euro_filter import OneEuroFilter
 
 try:
     import hand_mouse_core
@@ -17,20 +17,20 @@ class HybridMouseFilter:
             print("🚀 Using RUST Accelerated Filter")
         else:
             # 1. OneEuroFilter for jitter reduction in slow movements
-        # min_cutoff: Lower = smoother but more latency. 1.0 is a good balance.
-        # beta: Higher = less lag during fast movement.
-        self.one_euro = OneEuroFilter(t0=0, x0=0, dx0=0, min_cutoff=1.0, beta=0.007)
-        self.one_euro_y = OneEuroFilter(t0=0, x0=0, dx0=0, min_cutoff=1.0, beta=0.007)
-        
-        # 2. Kalman Filter for prediction/latency compensation
-        self.kalman = self._init_kalman()
-        
-        # 3. State & Heuristics
-        self.history = []
-        self.max_history = 10
-        self.last_pos = None
-        self.dead_zone = 2.0 # Pixels
-        self.last_timestamp = 0
+            # min_cutoff: Lower = smoother but more latency. 1.0 is a good balance.
+            # beta: Higher = less lag during fast movement.
+            self.one_euro = OneEuroFilter(t0=0, x0=0, dx0=0, min_cutoff=1.0, beta=0.007)
+            self.one_euro_y = OneEuroFilter(t0=0, x0=0, dx0=0, min_cutoff=1.0, beta=0.007)
+            
+            # 2. Kalman Filter for prediction/latency compensation
+            self.kalman = self._init_kalman()
+            
+            # 3. State & Heuristics
+            self.history = []
+            self.max_history = 10
+            self.last_pos = None
+            self.dead_zone = 2.0 # Pixels
+            self.last_timestamp = 0
         
     def _init_kalman(self):
         # State: [x, y, vx, vy]

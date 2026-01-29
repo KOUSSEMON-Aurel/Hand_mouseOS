@@ -6,23 +6,32 @@ import threading
 import time
 import math
 import os
-from mouse_driver import MouseDriver
-from optimized_utils import CameraConfigurator, PerformanceProfiler
-from advanced_filter import HybridMouseFilter # NEW
-from gesture_classifier import StaticGestureClassifier # NEW PHASE 4
+import socket
+import json
+import base64
+from src.mouse_driver import MouseDriver
+from src.optimized_utils import CameraConfigurator, PerformanceProfiler
+from src.advanced_filter import HybridMouseFilter # NEW
+from src.gesture_classifier import StaticGestureClassifier # NEW PHASE 4
 
 class HandEngine:
-    def __init__(self):
+    def __init__(self, headless=False):
+        self.headless = headless
         self.cap = None
-        self.is_processing = False # Control flag
-        self.is_processing = False # Control flag
+        self.is_processing = False # Manual start required
         self.running = True # Thread life flag
+        print("DEBUG: Engine initialized. Waiting for start command...")
+        
         self.mouse = MouseDriver()
         self.filter = HybridMouseFilter() # NEW: Initialize Filter
         self.gesture_classifier = StaticGestureClassifier() # NEW PHASE 4
         
         # --- OPTIMIZATION: Profiler ---
         self.profiler = PerformanceProfiler()
+        
+        # --- HUD STREAMING: UDP ---
+        self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.hud_addr = ("127.0.0.1", 5005)
         # -----------------------------
         # Async Result Storage
         self.lock = threading.Lock()
@@ -33,20 +42,6 @@ class HandEngine:
         
         # --- NEW API SETUP (GPU Default, Fallback in Loop) ---
         # ATTEMPT GPU
-        base_options_gpu = python.BaseOptions(model_asset_path='assets/hand_landmarker.task', delegate=python.BaseOptions.Delegate.GPU)
-        
-        print("🚀 INITIALIZING AI ENGINE (Attempting GPU)...")
-        self.options = vision.HandLandmarkerOptions(
-            base_options=base_options_gpu,
-            running_mode=vision.RunningMode.LIVE_STREAM,
-            num_hands=2, # DUAL HAND SUPPORT
-            min_hand_detection_confidence=0.5,
-            min_hand_presence_confidence=0.5,
-            min_tracking_confidence=0.5,
-            result_callback=self.result_callback)
-        self.using_gpu = False # Will be updated in loop
-        
-        self.prev_fps_time = 0
         
         # Start persistent thread
         self.thread = threading.Thread(target=self._run_loop, daemon=True)
@@ -62,6 +57,16 @@ class HandEngine:
             if result.hand_landmarks:
                 # We only take the first hand for the principal 3D display for now
                 self.latest_landmarks = result.hand_landmarks[0]
+                
+                # --- STREAM TO TAURI HUD ---
+                try:
+                    data = {
+                        "landmarks": [{"x": lm.x, "y": lm.y, "z": lm.z} for lm in result.hand_landmarks[0]],
+                        "ts": timestamp_ms / 1000.0
+                    }
+                    self.udp_socket.sendto(json.dumps(data).encode(), self.hud_addr)
+                except:
+                    pass
             else:
                 self.latest_landmarks = None
             
@@ -116,179 +121,225 @@ class HandEngine:
              with self.lock:
                  self.current_gestures = temp_gestures
 
-
     def start(self):
+        print("▶️ STARTING ENGINE PROCESSING")
         self.is_processing = True
 
     def stop(self):
+        print("⏹️ STOPPING ENGINE PROCESSING")
         self.is_processing = False
 
     def _get_distance(self, p1, p2):
         return math.hypot(p2[0] - p1[0], p2[1] - p1[1])
 
     def _run_loop(self):
-        # Persistent thread loop
-        self.landmarker = None
-        window_name = "Hand Mouse AI"
-        
-        # --- OPTIMIZATION: Configure Camera Hardware ---
-        print("DEBUG: Configuring Camera Hardware...")
-        CameraConfigurator.configure_camera() # Forces Exposure/Focus settings
-        # -----------------------------------------------
-        
-        while self.running:
-            if not self.is_processing:
-                # IDLE STATE: Release resources if they are open
-                if self.cap is not None:
-                    self.cap.release()
-                    self.cap = None
-                    cv2.destroyAllWindows()
-                    if self.landmarker:
-                         self.landmarker.close()
-                         self.landmarker = None
-                time.sleep(0.1)
-                continue
+        print(f"DEBUG: Thread _run_loop started. Running={self.running}")
+        try:
+            # Persistent thread loop
+            self.landmarker = None
+            window_name = "Hand Mouse AI"
             
-            # ACTIVE STATE: Initialize if needed
-            if self.cap is None:
-                print("DEBUG: Initializing Camera and Engine...")
-                self.cap = cv2.VideoCapture(0)
-                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                
-                cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-                cv2.resizeWindow(window_name, 640, 480)
-                
-                # Try GPU first, fallback to CPU
-                try:
-                    print("⚡ ATTEMPTING GPU INITIALIZATION...")
-                    self.landmarker = vision.HandLandmarker.create_from_options(self.options)
-                    self.using_gpu = True
-                    print("✅ GPU INITIALIZED SUCCESSFULLY")
-                except Exception as e:
-                    print(f"⚠️ GPU FAILED ({e}), FALLING BACK TO CPU...")
-                    # Fallback to CPU options
-                    base_options_cpu = python.BaseOptions(model_asset_path='assets/hand_landmarker.task', delegate=python.BaseOptions.Delegate.CPU)
-                    fallback_options = vision.HandLandmarkerOptions(
-                        base_options=base_options_cpu,
-                        running_mode=vision.RunningMode.LIVE_STREAM,
-                        num_hands=2, # DUAL HAND SUPPORT
-                        min_hand_detection_confidence=0.5,
-                        min_hand_presence_confidence=0.5,
-                        min_tracking_confidence=0.5,
-                        result_callback=self.result_callback)
-                    self.landmarker = vision.HandLandmarker.create_from_options(fallback_options)
-                    self.using_gpu = False
-                    print("✅ CPU FALLBACK ACTIVE")
+            # Init options once
+            print("DEBUG: Configuring MediaPipe Options...")
+            base_options_gpu = python.BaseOptions(model_asset_path='assets/hand_landmarker.task', delegate=python.BaseOptions.Delegate.GPU)
+            self.options = vision.HandLandmarkerOptions(
+                base_options=base_options_gpu,
+                running_mode=vision.RunningMode.LIVE_STREAM,
+                num_hands=2,
+                min_hand_detection_confidence=0.5,
+                min_hand_presence_confidence=0.5,
+                min_tracking_confidence=0.5,
+                result_callback=self.result_callback)
+            print("DEBUG: MediaPipe Options Configured.")
 
-                self.start_time = time.time()
-                self.last_timestamp_ms = 0
-                
-
-
-            # Processing Loop Step
-            try:
-                self.profiler.mark('start')
-                
-                success, img = self.cap.read()
-                if not success:
-                    time.sleep(0.1)
+            while self.running:
+                if not self.is_processing:
+                    if self.cap is not None:
+                        print("DEBUG: Pausing Engine (Releasing resources)...")
+                        self.cap.release()
+                        self.cap = None
+                        if not self.headless:
+                            cv2.destroyAllWindows()
+                        if self.landmarker:
+                             self.landmarker.close()
+                             self.landmarker = None
+                    time.sleep(0.5)
                     continue
-
-                self.profiler.mark('capture')
-
-                # 1. Flip & Convert
-                img = cv2.flip(img, 1)
-                img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_rgb)
-                
-                # 2. Detect Async
-                timestamp_ms = int((time.time() - self.start_time) * 1000)
-                if timestamp_ms <= self.last_timestamp_ms:
-                    timestamp_ms = self.last_timestamp_ms + 1
-                self.last_timestamp_ms = timestamp_ms
-                
-                if self.landmarker:
-                    # TRACKING: Store wall time for this timestamp
-                    self.inference_start_times[timestamp_ms] = time.time()
+            
+                # ACTIVE STATE: Initialize if needed
+                if self.cap is None:
+                    print("DEBUG: Initializing Camera and Engine...")
+                    # Auto-detect camera
+                    self.cap = None
+                    for cam_idx in range(5):
+                        print(f"📷 Testing camera index {cam_idx}...")
+                        temp_cap = cv2.VideoCapture(cam_idx)
+                        if temp_cap.isOpened():
+                            # Try reading a frame to be sure
+                            ret, _ = temp_cap.read()
+                            if ret:
+                                self.cap = temp_cap
+                                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                                print(f"✅ Found working camera at index {cam_idx}")
+                                break
+                            else:
+                                temp_cap.release()
                     
-                    # Cleanup old timestamps (prevent memory leak)
-                    if len(self.inference_start_times) > 100:
-                        # Remove keys older than 1 second (approx)
-                        cutoff = timestamp_ms - 2000 
-                        keys_to_remove = [k for k in self.inference_start_times.keys() if k < cutoff]
-                        for k in keys_to_remove:
-                            del self.inference_start_times[k]
+                    if self.cap is None:
+                        print("❌ NO WORKING CAMERA FOUND! Please check connections.")
+                        # Sleep to avoid CPU spin if no camera
+                        time.sleep(2)
+                        continue
+
+                    if not self.headless:
+                        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+                        cv2.resizeWindow(window_name, 640, 480)
+                    
+                    # Try GPU first, fallback to CPU
+                    try:
+                        print("⚡ ATTEMPTING GPU INITIALIZATION...")
+                        self.landmarker = vision.HandLandmarker.create_from_options(self.options)
+                        self.using_gpu = True
+                        print("✅ GPU INITIALIZED SUCCESSFULLY")
+                    except Exception as e:
+                        print(f"⚠️ GPU FAILED ({e}), FALLING BACK TO CPU...")
+                        # Fallback to CPU options
+                        base_options_cpu = python.BaseOptions(model_asset_path='assets/hand_landmarker.task', delegate=python.BaseOptions.Delegate.CPU)
+                        fallback_options = vision.HandLandmarkerOptions(
+                            base_options=base_options_cpu,
+                            running_mode=vision.RunningMode.LIVE_STREAM,
+                            num_hands=2, # DUAL HAND SUPPORT
+                            min_hand_detection_confidence=0.5,
+                            min_hand_presence_confidence=0.5,
+                            min_tracking_confidence=0.5,
+                            result_callback=self.result_callback)
+                        self.landmarker = vision.HandLandmarker.create_from_options(fallback_options)
+                        self.using_gpu = False
+                        print("✅ CPU FALLBACK ACTIVE")
+
+                    self.start_time = time.time()
+                    self.last_timestamp_ms = 0
+                
+
+
+                # Processing Loop Step
+                try:
+                    self.profiler.mark('start')
+                    
+                    if self.cap is None:
+                        time.sleep(0.1)
+                        continue
+
+                    success, img = self.cap.read()
+                    if not success:
+                        time.sleep(0.1)
+                        continue
+
+                    self.profiler.mark('capture')
+
+                    # 1. Flip & Convert
+                    img = cv2.flip(img, 1)
+                    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_rgb)
+                    
+                    # 2. Detect Async
+                    timestamp_ms = int((time.time() - self.start_time) * 1000)
+                    if timestamp_ms <= self.last_timestamp_ms:
+                        timestamp_ms = self.last_timestamp_ms + 1
+                    self.last_timestamp_ms = timestamp_ms
+                    
+                    if self.landmarker:
+                        # TRACKING: Store wall time for this timestamp
+                        self.inference_start_times[timestamp_ms] = time.time()
+                        
+                        # Cleanup old timestamps (prevent memory leak)
+                        if len(self.inference_start_times) > 100:
+                            # Remove keys older than 1 second (approx)
+                            cutoff = timestamp_ms - 2000 
+                            keys_to_remove = [k for k in self.inference_start_times.keys() if k < cutoff]
+                            for k in keys_to_remove:
+                                del self.inference_start_times[k]
+                                
+                        self.landmarker.detect_async(mp_image, timestamp_ms)
+                    
+                    self.profiler.mark('inference_sent')
+
+                    # 3. Draw LATEST known result
+                    # FPS Calculation from Profiler
+                    fps = self.profiler.get_fps()
+                    cv2.putText(img, f"OPS: {int(fps)}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                    
+                    # STATUS HUD
+                    status_color = (0, 255, 0) if self.using_gpu else (0, 165, 255) # Green for GPU, Orange for CPU
+                    status_text = "GPU: ON" if self.using_gpu else "GPU: OFF (CPU)"
+                    cv2.putText(img, status_text, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, status_color, 2)
+
+                    local_result = None
+                    local_gestures = []
+                    with self.lock:
+                        if self.latest_result:
+                             local_result = self.latest_result
+                             local_gestures = self.current_gestures
+                    
+                    if local_result and local_result.hand_landmarks:
+                        h, w, c = img.shape
+                        for i, hand_landmarks in enumerate(local_result.hand_landmarks):
+                            # Hand Connections (Simplified)
+                            CONNECTIONS = frozenset([
+                                (0, 1), (1, 2), (2, 3), (3, 4),
+                                (0, 5), (5, 6), (6, 7), (7, 8),
+                                (5, 9), (9, 10), (10, 11), (11, 12),
+                                (9, 13), (13, 14), (14, 15), (15, 16),
+                                (13, 17), (17, 18), (18, 19), (19, 20),
+                                (0, 17)
+                            ])
                             
-                    self.landmarker.detect_async(mp_image, timestamp_ms)
-                
-                self.profiler.mark('inference_sent')
+                            lm_list = []
+                            for lm in hand_landmarks:
+                                px, py = int(lm.x * w), int(lm.y * h)
+                                lm_list.append((px, py))
+                                cv2.circle(img, (px, py), 3, (0, 255, 255), cv2.FILLED) 
 
-                # 3. Draw LATEST known result
-                # FPS Calculation from Profiler
-                fps = self.profiler.get_fps()
-                cv2.putText(img, f"OPS: {int(fps)}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                
-                # STATUS HUD
-                status_color = (0, 255, 0) if self.using_gpu else (0, 165, 255) # Green for GPU, Orange for CPU
-                status_text = "GPU: ON" if self.using_gpu else "GPU: OFF (CPU)"
-                cv2.putText(img, status_text, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, status_color, 2)
+                            for start_idx, end_idx in CONNECTIONS:
+                                 if start_idx < len(lm_list) and end_idx < len(lm_list):
+                                     cv2.line(img, lm_list[start_idx], lm_list[end_idx], (0, 255, 0), 2)
 
-                local_result = None
-                local_gestures = []
-                with self.lock:
-                    if self.latest_result:
-                         local_result = self.latest_result
-                         local_gestures = self.current_gestures
-                
-                if local_result and local_result.hand_landmarks:
-                    h, w, c = img.shape
-                    for i, hand_landmarks in enumerate(local_result.hand_landmarks):
-                        # Hand Connections (Simplified)
-                        CONNECTIONS = frozenset([
-                            (0, 1), (1, 2), (2, 3), (3, 4),
-                            (0, 5), (5, 6), (6, 7), (7, 8),
-                            (5, 9), (9, 10), (10, 11), (11, 12),
-                            (9, 13), (13, 14), (14, 15), (15, 16),
-                            (13, 17), (17, 18), (18, 19), (19, 20),
-                            (0, 17)
-                        ])
-                        
-                        lm_list = []
-                        for lm in hand_landmarks:
-                            px, py = int(lm.x * w), int(lm.y * h)
-                            lm_list.append((px, py))
-                            cv2.circle(img, (px, py), 3, (0, 255, 255), cv2.FILLED) 
+                            # HUD for this Hand
+                            gesture = local_gestures[i] if i < len(local_gestures) else "TRACKING"
+                            hand_label = "M" if i == 0 else "S" # Master / Secondary
+                            color = (0, 255, 0) if i == 0 else (255, 0, 255) # Primary Green, Secondary Purple
+                            
+                            root_x, root_y = lm_list[0]
+                            cv2.putText(img, f"[{hand_label}] {gesture}", (root_x - 20, root_y + 30), 
+                                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
-                        for start_idx, end_idx in CONNECTIONS:
-                             if start_idx < len(lm_list) and end_idx < len(lm_list):
-                                 cv2.line(img, lm_list[start_idx], lm_list[end_idx], (0, 255, 0), 2)
-
-                        # HUD for this Hand
-                        gesture = local_gestures[i] if i < len(local_gestures) else "TRACKING"
-                        hand_label = "M" if i == 0 else "S" # Master / Secondary
-                        color = (0, 255, 0) if i == 0 else (255, 0, 255) # Primary Green, Secondary Purple
-                        
-                        root_x, root_y = lm_list[0]
-                        cv2.putText(img, f"[{hand_label}] {gesture}", (root_x - 20, root_y + 30), 
-                                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-
-                # 4. Show Native Window
-                cv2.imshow(window_name, img)
-                
-                self.profiler.mark('end')
-                self.profiler.measure('total', 'start', 'end')
-                
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    self.stop()
+                    # 4. Show Native Window
+                    if not self.headless:
+                        cv2.imshow(window_name, img)
                     
-            except Exception as e:
-                import traceback
-                print("Error in Engine Loop (Recovering...):")
-                traceback.print_exc()
-                time.sleep(0.1)
+                    self.profiler.mark('end')
+                    self.profiler.measure('total', 'start', 'end')
+                    
+                    if self.frame_callback:
+                        # Encode to Base64 for Flet Image
+                        _, buffer = cv2.imencode('.jpg', img)
+                        b64_img = base64.b64encode(buffer).decode('utf-8')
+                        self.frame_callback(b64_img)
 
-    def set_smoothing(self, value):
-        self.mouse.set_smoothing(value)
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        self.stop()
+                        
+                except Exception as e:
+                    import traceback
+                    print("Error in Engine Loop (Recovering...):")
+                    traceback.print_exc()
+                    time.sleep(0.1)
+
+        except Exception as e:
+            import traceback
+            print(f"❌ CRITICAL ERROR IN ENGINE THREAD: {e}")
+            traceback.print_exc()
+
     def set_smoothing(self, value):
         self.mouse.set_smoothing(value)

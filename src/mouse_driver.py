@@ -2,7 +2,7 @@ import platform
 import time
 import math
 import pyautogui
-from optimized_utils import AdaptiveOneEuroFilter, AdaptiveSensitivityMapper
+from src.optimized_utils import AdaptiveOneEuroFilter, AdaptiveSensitivityMapper
 
 # Try to import uinput (Linux only)
 try:
