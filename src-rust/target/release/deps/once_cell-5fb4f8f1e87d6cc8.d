@@ -1,9 +1,0 @@
-/home/aurel/CODE/Hand_mouseOS/src-rust/target/release/deps/once_cell-5fb4f8f1e87d6cc8.d: /home/aurel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.3/src/lib.rs /home/aurel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.3/src/imp_std.rs /home/aurel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.3/src/race.rs
-
-/home/aurel/CODE/Hand_mouseOS/src-rust/target/release/deps/libonce_cell-5fb4f8f1e87d6cc8.rlib: /home/aurel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.3/src/lib.rs /home/aurel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.3/src/imp_std.rs /home/aurel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.3/src/race.rs
-
-/home/aurel/CODE/Hand_mouseOS/src-rust/target/release/deps/libonce_cell-5fb4f8f1e87d6cc8.rmeta: /home/aurel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.3/src/lib.rs /home/aurel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.3/src/imp_std.rs /home/aurel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.3/src/race.rs
-
-/home/aurel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.3/src/lib.rs:
-/home/aurel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.3/src/imp_std.rs:
-/home/aurel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.3/src/race.rs:
