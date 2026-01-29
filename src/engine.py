@@ -9,6 +9,7 @@ import os
 import socket
 import json
 import base64
+import numpy as np  # PHASE 8: Required for keyboard canvas
 from src.mouse_driver import MouseDriver
 from src.optimized_utils import CameraConfigurator, PerformanceProfiler
 from src.advanced_filter import HybridMouseFilter # NEW
