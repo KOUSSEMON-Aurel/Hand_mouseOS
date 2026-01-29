@@ -3,12 +3,14 @@ from typing import List, Tuple, Dict
 from enum import Enum
 
 class Gesture(Enum):
-    """Les 5 gestes universels du système simplifié."""
+    """Les gestes universels du système simplifié."""
     POINTING = "POINTING"       # 👆 Index tendu seul
     PINCH = "PINCH"            # 👌 Pouce + Index joints
     PALM = "PALM"              # ✋ Main ouverte
     FIST = "FIST"              # ✊ Poing fermé
     TWO_FINGERS = "TWO_FINGERS" # ✌️ Index + Majeur tendus
+    THUMBS_UP = "THUMBS_UP"    # 👍 Pouce en l'air
+    THUMBS_DOWN = "THUMBS_DOWN" # 👎 Pouce vers le bas
     UNKNOWN = "UNKNOWN"        # Pose non reconnue
 
 
@@ -46,19 +48,33 @@ class StaticGestureClassifier:
         fingers_extended = self._get_extended_fingers(landmarks)
         # fingers_extended: [Pouce, Index, Majeur, Annulaire, Auriculaire]
         
-        # 2. PALM (Tous les doigts étendus)
+        # 2. THUMBS UP / DOWN (Pouce seul tendu, autres repliés)
+        if fingers_extended[0] and not any(fingers_extended[1:]):
+            # Pouce seul tendu, vérifier orientation Y
+            thumb_tip = landmarks[4]
+            thumb_mcp = landmarks[2]  # Base du pouce
+            wrist = landmarks[0]
+            
+            # THUMBS_UP: Pouce au-dessus du poignet (y plus petit)
+            # THUMBS_DOWN: Pouce en-dessous du poignet (y plus grand)
+            if thumb_tip.y < wrist.y - 0.05:  # Seuil pour éviter faux positifs
+                return Gesture.THUMBS_UP.value
+            elif thumb_tip.y > wrist.y + 0.05:
+                return Gesture.THUMBS_DOWN.value
+        
+        # 3. PALM (Tous les doigts étendus)
         if all(fingers_extended):
             return Gesture.PALM.value
             
-        # 3. FIST (Aucun doigt étendu sauf peut-être pouce replié)
+        # 4. FIST (Aucun doigt étendu sauf peut-être pouce replié)
         if not any(fingers_extended[1:]):  # Ignore le pouce
             return Gesture.FIST.value
         
-        # 4. POINTING (Seul l'index étendu)
+        # 5. POINTING (Seul l'index étendu)
         if fingers_extended[1] and not any(fingers_extended[2:]):
             return Gesture.POINTING.value
             
-        # 5. TWO_FINGERS (Index + Majeur étendus, autres repliés)
+        # 6. TWO_FINGERS (Index + Majeur étendus, autres repliés)
         if fingers_extended[1] and fingers_extended[2] and not any(fingers_extended[3:]):
             return Gesture.TWO_FINGERS.value
             
@@ -119,6 +135,8 @@ class StaticGestureClassifier:
             Gesture.PALM.value: "✋",
             Gesture.FIST.value: "✊",
             Gesture.TWO_FINGERS.value: "✌️",
+            Gesture.THUMBS_UP.value: "👍",
+            Gesture.THUMBS_DOWN.value: "👎",
             Gesture.UNKNOWN.value: "❓"
         }
         return emojis.get(gesture, "❓")

@@ -179,17 +179,15 @@ class HandEngine:
                  # if int(timestamp_ms / 33) % 30 == 0:
                  #      print(f"DEBUG: Geste={primary_gesture} Mode={new_mode.value} Action={action}")
 
-                 # --- PHASE 8: FREEZE TOGGLE VIA TWO_FINGERS GESTURE ---
-                 if primary_gesture == "TWO_FINGERS":
-                     self._freeze_gesture_frames += 1
-                     if self._freeze_gesture_frames >= self._freeze_gesture_threshold:
-                         # Toggle freeze
-                         self.mouse_frozen = not self.mouse_frozen
-                         status = "GELÉE ❄️" if self.mouse_frozen else "DÉGELÉE ✅"
-                         print(f"🕹️ Souris: {status}")
-                         self._freeze_gesture_frames = 0  # Reset
-                 else:
-                     self._freeze_gesture_frames = 0  # Reset if not TWO_FINGERS
+                  # --- PHASE 8: FREEZE TOGGLE VIA THUMBS GESTURES ---
+                  if primary_gesture == "THUMBS_UP":
+                      if self.mouse_frozen:
+                          self.mouse_frozen = False
+                          print(f"👍 Souris: DÉGELÉE ✅")
+                  elif primary_gesture == "THUMBS_DOWN":
+                      if not self.mouse_frozen:
+                          self.mouse_frozen = True
+                          print(f"👎 Souris: GELÉE ❄️")
 
                  # 4. Execute Action (Mouse Movement is special)
                  h, w = 480, 640 # Canvas size
