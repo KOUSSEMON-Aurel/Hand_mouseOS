@@ -22,6 +22,7 @@ class FeedbackOverlay:
         "window": (255, 0, 255),    # Magenta
         "media": (0, 255, 0),       # Vert
         "shortcut": (0, 255, 255),  # Jaune
+        "asl": (255, 165, 0),       # Orange pour ASL
     }
     
     # Emojis textuels (car OpenCV ne supporte pas les vrais emojis)
@@ -31,6 +32,8 @@ class FeedbackOverlay:
         "PALM": "[=]",
         "FIST": "[#]",
         "TWO_FINGERS": "[V]",
+        "THUMBS_UP": "[+]", 
+        "THUMBS_DOWN": "[-]",
         "UNKNOWN": "[?]",
     }
     
@@ -39,6 +42,7 @@ class FeedbackOverlay:
         "window": "FENETRES",
         "media": "MULTIMEDIA",
         "shortcut": "RACCOURCIS",
+        "asl": "ASL (SIGNES)",
     }
     
     def __init__(self, position: str = "top_left"):

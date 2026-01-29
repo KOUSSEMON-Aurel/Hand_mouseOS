@@ -516,12 +516,15 @@ class HandEngine:
                     display_action = self.action_dispatcher.get_action_info(local_action)["emoji"] + " " + self.action_dispatcher.get_action_info(local_action)["name"]
                     
                     # Override Display Action if ASL is ON
+                    # Override Display Action if ASL is ON
+                    overlay_mode = local_mode.value
                     if self.asl_enabled:
-                        display_action = f"ASL: {self.last_asl_prediction}"
+                        overlay_mode = "asl"
+                        display_action = f"SIGNE: {getattr(self, 'last_asl_prediction', 'En attente...')}"
                         
                     img = self.feedback_overlay.draw(
                         frame=img,
-                        mode=local_mode.value,
+                        mode=overlay_mode,
                         gesture=display_gesture,
                         action=display_action,
                         confidence=1.0 # Placeholder
