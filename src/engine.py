@@ -234,7 +234,7 @@ class HandEngine:
 
     def _draw_skeleton_4view(self, result):
         """Draws a 4-view skeleton visualization in a native OpenCV window."""
-        import numpy as np
+        # numpy imported globally now
         
         # Canvas 600x400 (4 quadrants: 300x200 each)
         img = np.zeros((400, 600, 3), dtype=np.uint8)
@@ -516,7 +516,7 @@ class HandEngine:
 
                     # 4. Show Unified Native Window (Video + Skeleton side by side)
                     if not self.headless:
-                        import numpy as np
+                        # numpy imported globally now
                         # Resize video to match skeleton height (400px)
                         video_resized = cv2.resize(img, (533, 400))  # 4:3 aspect ratio -> 533x400
                         

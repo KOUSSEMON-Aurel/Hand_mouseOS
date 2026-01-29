@@ -339,6 +339,13 @@ class AppGUI:
     
     def toggle_keyboard(self, e):
         """Active/Désactive le clavier virtuel."""
+        # Safety: Only allow if engine is running
+        if not self.engine.is_processing and e.control.value:
+            print("⚠️ Démarrez le système avant d'activer le clavier!")
+            e.control.value = False
+            self.switch_keyboard.update()
+            return
+        
         self.engine.keyboard_enabled = e.control.value
         print(f"🔤 Clavier Virtuel: {'ACTIVÉ' if e.control.value else 'DÉSACTIVÉ'}")
     
