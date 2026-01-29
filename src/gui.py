@@ -1,6 +1,10 @@
 import flet as ft
 import threading
 import time
+import json
+import os
+import http.server
+import socket
 from engine import HandEngine
 from gestures_view import GesturesView
 from settings_view import SettingsView
@@ -14,6 +18,11 @@ class AppGUI:
         self.page.bgcolor = "#1a1c21"
         
         self.engine = HandEngine()
+        self.wv_3d = None # WebView for 3D HUD
+        
+        # Start Local HUD Server
+        self.port = self.find_free_port()
+        threading.Thread(target=self.start_asset_server, daemon=True).start()
         
         # Navigation State
         self.current_view_index = 0
@@ -22,6 +31,19 @@ class AppGUI:
         self.build_layout()
         self.render_view(0)
         
+    def find_free_port(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(('', 0))
+            return s.getsockname()[1]
+
+    def start_asset_server(self):
+        # Serve from project root to access assets/
+        os.chdir(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+        handler = http.server.SimpleHTTPRequestHandler
+        with http.server.HTTPServer(("", self.port), handler) as httpd:
+            print(f"HUD Asset Server running on port {self.port}")
+            httpd.serve_forever()
+
     def init_components(self):
         # Sidebar items
         self.menu_items = [
@@ -104,43 +126,78 @@ class AppGUI:
             )
         )
 
+        # 3D HUD WebView
+        self.wv_3d = ft.WebView(
+            url=f"http://localhost:{self.port}/assets/3d/hand_scene.html",
+            on_page_started=lambda _: print("3D HUD Started"),
+            expand=True
+        )
+
         # Dashboard Layout
         dashboard = ft.Container(
             content=ft.Column([
-                ft.Text("Hand Mouse OS", size=40, weight=ft.FontWeight.BOLD),
-                ft.Text("V 1.0.0 - Optimized Core", size=16, color=ft.Colors.GREY_400),
-                ft.Container(height=30),
-                
                 ft.Row([
-                    # Status Card
-                    ft.Container(
-                        content=ft.Column([
-                            ft.Icon(ft.Icons.MONITOR_HEART, size=40, color=ft.Colors.BLUE_400),
-                            ft.Text("AI Engine", size=14, weight=ft.FontWeight.BOLD),
-                            self.btn_start
-                        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                        bgcolor="#2b2d31", padding=20, border_radius=15, width=200
-                    ),
-                ], alignment=ft.MainAxisAlignment.CENTER),
-                
-                ft.Container(height=30),
-                ft.Container(height=30),
-                ft.Row([
-                    ft.Text("Performance Monitor:", weight=ft.FontWeight.BOLD),
-                    ft.Container(width=10),
-                    self.txt_latency  # Added control
+                    ft.Text("Hand Mouse OS", size=30, weight=ft.FontWeight.BOLD),
+                    ft.Container(expand=True),
+                    self.txt_latency
                 ]),
-                ft.Container(
-                    content=self.logs_view, # Reusing container as logs_view
-                    bgcolor="#111111", padding=10, border_radius=5, width=600, height=150
-                )
+                
+                ft.Row([
+                    # Left Side: Visualization
+                    ft.Container(
+                        content=self.wv_3d,
+                        bgcolor="#000000",
+                        border_radius=15,
+                        width=600,
+                        height=400,
+                        border=ft.border.all(1, "#45a29e")
+                    ),
+                    
+                    # Right Side: Status & Controls
+                    ft.Column([
+                        ft.Container(
+                            content=ft.Column([
+                                ft.Icon(ft.Icons.MONITOR_HEART, size=40, color=ft.Colors.BLUE_400),
+                                ft.Text("AI Engine", size=14, weight=ft.FontWeight.BOLD),
+                                self.btn_start
+                            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                            bgcolor="#2b2d31", padding=20, border_radius=15, width=200
+                        ),
+                        
+                        ft.Container(
+                            content=ft.Column([
+                                ft.Text("System Logs", size=12, color=ft.Colors.GREY_400),
+                                self.logs_view
+                            ]),
+                            bgcolor="#111111", padding=15, border_radius=10, width=200, height=220
+                        )
+                    ])
+                ], spacing=20, alignment=ft.MainAxisAlignment.START)
             ]),
-            padding=40
+            padding=30
         )
         self.content_area.controls.append(dashboard)
 
-        # Start metrics update loop
+        # Start loops
         threading.Thread(target=self.update_metrics_loop, daemon=True).start()
+        threading.Thread(target=self.update_3d_loop, daemon=True).start()
+
+    def update_3d_loop(self):
+        while True:
+            if self.engine.is_processing and self.wv_3d:
+                with self.engine.lock:
+                    landmarks = self.engine.latest_landmarks
+                
+                if landmarks:
+                    # Convert MediaPipe landmarks to simple list of dicts for JS
+                    data = [{"x": lm.x, "y": lm.y, "z": lm.z} for lm in landmarks]
+                    js_data = json.dumps(data)
+                    try:
+                        # Use window.postMessage for cleaner data transfer
+                        self.wv_3d.run_javascript(f"window.postMessage({js_data}, '*')")
+                    except Exception as e:
+                        pass
+            time.sleep(0.033) # ~30 FPS for 3D view
 
     def update_metrics_loop(self):
         while True:

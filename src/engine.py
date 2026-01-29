@@ -27,6 +27,7 @@ class HandEngine:
         # Async Result Storage
         self.lock = threading.Lock()
         self.latest_result = None
+        self.latest_landmarks = None # NEW: For 3D HUD
         self.inference_start_times = {} # Map timestamp_ms -> wall_time
         self.current_gestures = [] # NEW PHASE 4
         
@@ -58,6 +59,11 @@ class HandEngine:
 
         with self.lock:
             self.latest_result = result
+            if result.hand_landmarks:
+                # We only take the first hand for the principal 3D display for now
+                self.latest_landmarks = result.hand_landmarks[0]
+            else:
+                self.latest_landmarks = None
             
         if result.hand_landmarks:
              # Calculate Latency
