@@ -107,7 +107,7 @@ class GesturesView(ft.Column):
                         padding=ft.padding.symmetric(6, 12),
                         border_radius=20,
                     ),
-                    ft.Spacer(),
+                    ft.Container(expand=True),
                     ft.Icon(main_icon, color=theme_color, size=30),
                 ]),
                 
