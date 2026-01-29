@@ -21,9 +21,15 @@ class MouseDriver:
         # --- OPTIMIZATION INTEGRATION ---
         self.filter = AdaptiveOneEuroFilter()
         self.mapper = AdaptiveSensitivityMapper(self.sw, self.sh, gamma=1.3)
+        # self.calibration removed
         # -------------------------------
         
         self.mode = "pyautogui"
+        self.frozen_until = 0  # Stability: Freeze cursor during clicks
+        
+        # Optimize PyAutoGUI for speed (Default is 0.1s pause!)
+        pyautogui.PAUSE = 0
+        pyautogui.FAILSAFE = False
         
         # Check for Linux & UInput support
         if self.os_name == "Linux" and UINPUT_AVAILABLE:
@@ -47,11 +53,16 @@ class MouseDriver:
         if timestamp is None:
             timestamp = time.time()
 
+        # STABILITY: If frozen (clicking), do not move cursor
+        if time.time() < self.frozen_until:
+            return
+
         # 1. Normalize Coordinates [0, 1]
         norm_x = x / frame_w
         norm_y = y / frame_h
         
         # 2. Map directly to Screen Coordinates using Smart Mapper (Non-linear)
+        # Calibration removed by user request - Back to standard mapping
         target_x, target_y = self.mapper.map(norm_x, norm_y)
 
         # 3. Apply Adaptive Filter (Smart Smoothing)
@@ -66,9 +77,16 @@ class MouseDriver:
             self.device.emit(uinput.ABS_X, screen_x, syn=False)
             self.device.emit(uinput.ABS_Y, screen_y)
         else:
-            pyautogui.moveTo(screen_x, screen_y)
+            print(f"DEBUG: Move -> {screen_x}, {screen_y}")
+            try:
+                pyautogui.moveTo(screen_x, screen_y)
+            except Exception as e:
+                print(f"❌ PyAutoGUI Error: {e}")
 
     def click(self):
+        # STABILITY: Freeze cursor for 200ms to allow clean click without jitter
+        self.frozen_until = time.time() + 0.2
+        
         if self.mode == "uinput" and hasattr(self, 'device'):
             self.device.emit(uinput.BTN_LEFT, 1)
             self.device.emit(uinput.BTN_LEFT, 0)

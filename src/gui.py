@@ -1,6 +1,9 @@
 import flet as ft
+import threading
+import time
 from engine import HandEngine
-from calibration_view import CalibrationView
+from gestures_view import GesturesView
+from settings_view import SettingsView
 
 class AppGUI:
     def __init__(self, page: ft.Page):
@@ -25,12 +28,12 @@ class AppGUI:
             ft.NavigationRailDestination(
                 icon=ft.Icons.DASHBOARD_OUTLINED,
                 selected_icon=ft.Icons.DASHBOARD,
-                label="Tableau de bord"
+                label="Bord"
             ),
             ft.NavigationRailDestination(
-                icon=ft.Icons.SETTINGS_OVERSCAN_OUTLINED,
-                selected_icon=ft.Icons.SETTINGS_OVERSCAN,
-                label="Calibration"
+                icon=ft.Icons.BACK_HAND_OUTLINED,
+                selected_icon=ft.Icons.BACK_HAND,
+                label="Gestes"
             ),
             ft.NavigationRailDestination(
                 icon=ft.Icons.SETTINGS_OUTLINED,
@@ -63,15 +66,9 @@ class AppGUI:
         if idx == 0:
             self.build_live_view()
         elif idx == 1:
-            self.content_area.controls.append(CalibrationView(self))
+            self.content_area.controls.append(GesturesView())
         elif idx == 2:
-            self.content_area.controls.append(
-                ft.Container(
-                    content=ft.Text("Paramètres avancés (À venir dans v1.1)", size=20, color=ft.Colors.GREY_500),
-                    alignment=ft.alignment.center,
-                    padding=50
-                )
-            )
+            self.content_area.controls.append(SettingsView(self))
             
         if self.content_area.page:
             self.content_area.update()
@@ -86,6 +83,10 @@ class AppGUI:
         icon = ft.Icons.PLAY_ARROW
         text = "Start System"
         color = ft.Colors.BLUE_400
+        
+        # Init metrics controls
+        self.txt_latency = ft.Text("Waiting...", color=ft.Colors.CYAN_400, weight=ft.FontWeight.BOLD)
+        self.logs_view = ft.Text("System initialized.\nReady.", font_family="Consolas", color=ft.Colors.GREEN_400)
         
         if self.engine.is_processing:
              icon = ft.Icons.STOP
@@ -120,28 +121,39 @@ class AppGUI:
                         ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                         bgcolor="#2b2d31", padding=20, border_radius=15, width=200
                     ),
-                    
-                    # Info Card
-                    ft.Container(
-                        content=ft.Column([
-                            ft.Icon(ft.Icons.INFO_OUTLINE, size=40, color=ft.Colors.ORANGE_400),
-                            ft.Text("GPU Status", size=14, weight=ft.FontWeight.BOLD),
-                            ft.Text("CPU Fallback" if "CPU" in str(self.engine.options.base_options.delegate) else "Auto/GPU", size=12)
-                        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                        bgcolor="#2b2d31", padding=20, border_radius=15, width=200
-                    )
-                ], spacing=20),
+                ], alignment=ft.MainAxisAlignment.CENTER),
                 
                 ft.Container(height=30),
-                ft.Text("Console Logs:", weight=ft.FontWeight.BOLD),
+                ft.Container(height=30),
+                ft.Row([
+                    ft.Text("Performance Monitor:", weight=ft.FontWeight.BOLD),
+                    ft.Container(width=10),
+                    self.txt_latency  # Added control
+                ]),
                 ft.Container(
-                    content=ft.Text("System initialized.\nReady to capture.", font_family="Consolas", color=ft.Colors.GREEN_400),
+                    content=self.logs_view, # Reusing container as logs_view
                     bgcolor="#111111", padding=10, border_radius=5, width=600, height=150
                 )
             ]),
             padding=40
         )
         self.content_area.controls.append(dashboard)
+
+        # Start metrics update loop
+        threading.Thread(target=self.update_metrics_loop, daemon=True).start()
+
+    def update_metrics_loop(self):
+        while True:
+            if hasattr(self, 'txt_latency') and self.content_area.page:
+                if self.engine.is_processing:
+                    fps = self.engine.profiler.get_fps()
+                    lat = self.engine.profiler.get_inference_time()
+                    try:
+                        self.txt_latency.value = f"FPS: {fps:.1f} | Latency: {lat:.1f} ms"
+                        self.txt_latency.update()
+                    except:
+                        pass
+            time.sleep(0.5)
 
     def toggle_engine(self, e):
         if not self.engine.is_processing:

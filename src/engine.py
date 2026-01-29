@@ -8,6 +8,7 @@ import math
 import os
 from mouse_driver import MouseDriver
 from optimized_utils import CameraConfigurator, PerformanceProfiler
+from advanced_filter import HybridMouseFilter # NEW
 
 class HandEngine:
     def __init__(self):
@@ -15,6 +16,7 @@ class HandEngine:
         self.is_processing = False # Control flag
         self.running = True # Thread life flag
         self.mouse = MouseDriver()
+        self.filter = HybridMouseFilter() # NEW: Initialize Filter
         
         # --- OPTIMIZATION: Profiler ---
         self.profiler = PerformanceProfiler()
@@ -23,37 +25,20 @@ class HandEngine:
         self.lock = threading.Lock()
         self.latest_result = None
         
-        # --- NEW API SETUP (GPU/CPU) ---
+        # --- NEW API SETUP (GPU Default, Fallback in Loop) ---
+        # ATTEMPT GPU
         base_options_gpu = python.BaseOptions(model_asset_path='assets/hand_landmarker.task', delegate=python.BaseOptions.Delegate.GPU)
-        base_options_cpu = python.BaseOptions(model_asset_path='assets/hand_landmarker.task', delegate=python.BaseOptions.Delegate.CPU)
         
-        try:
-            print("🚀 INITIALIZING AI ENGINE (Attempting GPU Acceleration)...")
-            self.options = vision.HandLandmarkerOptions(
-                base_options=base_options_gpu,
-                running_mode=vision.RunningMode.LIVE_STREAM,
-                num_hands=1,
-                min_hand_detection_confidence=0.7,
-                min_hand_presence_confidence=0.7,
-                min_tracking_confidence=0.7,
-                result_callback=self.result_callback)
-            
-            # Test initialization to trigger immediate failure if GPU missing
-            temp_landmarker = vision.HandLandmarker.create_from_options(self.options)
-            temp_landmarker.close()
-            print("✅ GPU ACCELERATION ENABLED! (High Performance Mode)")
-            
-        except Exception as e:
-            print(f"⚠️ GPU init failed ({e}). Falling back to CPU.")
-            self.options = vision.HandLandmarkerOptions(
-                base_options=base_options_cpu,
-                running_mode=vision.RunningMode.LIVE_STREAM,
-                num_hands=1,
-                min_hand_detection_confidence=0.7,
-                min_hand_presence_confidence=0.7,
-                min_tracking_confidence=0.7,
-                result_callback=self.result_callback)
-            print("✅ CPU MODE ACTIVE (Standard Performance)")
+        print("🚀 INITIALIZING AI ENGINE (Attempting GPU)...")
+        self.options = vision.HandLandmarkerOptions(
+            base_options=base_options_gpu,
+            running_mode=vision.RunningMode.LIVE_STREAM,
+            num_hands=1,
+            min_hand_detection_confidence=0.5,
+            min_hand_presence_confidence=0.5,
+            min_tracking_confidence=0.5,
+            result_callback=self.result_callback)
+        self.using_gpu = False # Will be updated in loop
         
         self.prev_fps_time = 0
         
@@ -84,7 +69,11 @@ class HandEngine:
                     if distance < 40: # Click
                         self.mouse.click()
                     else: # Move
-                         self.mouse.move(lm_list[8][0], lm_list[8][1], w, h, timestamp=ts_seconds)
+                         # APPLY HYBRID FILTER
+                         raw_x, raw_y = lm_list[8]
+                         smooth_x, smooth_y = self.filter.process(raw_x, raw_y, ts_seconds)
+                         print(f"📍 ENGINE: Request Move {smooth_x:.1f}, {smooth_y:.1f}")
+                         self.mouse.move(smooth_x, smooth_y, w, h, timestamp=ts_seconds)
 
 
     def start(self):
@@ -129,9 +118,32 @@ class HandEngine:
                 cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
                 cv2.resizeWindow(window_name, 640, 480)
                 
-                self.landmarker = vision.HandLandmarker.create_from_options(self.options)
+                # Try GPU first, fallback to CPU
+                try:
+                    print("⚡ ATTEMPTING GPU INITIALIZATION...")
+                    self.landmarker = vision.HandLandmarker.create_from_options(self.options)
+                    self.using_gpu = True
+                    print("✅ GPU INITIALIZED SUCCESSFULLY")
+                except Exception as e:
+                    print(f"⚠️ GPU FAILED ({e}), FALLING BACK TO CPU...")
+                    # Fallback to CPU options
+                    base_options_cpu = python.BaseOptions(model_asset_path='assets/hand_landmarker.task', delegate=python.BaseOptions.Delegate.CPU)
+                    fallback_options = vision.HandLandmarkerOptions(
+                        base_options=base_options_cpu,
+                        running_mode=vision.RunningMode.LIVE_STREAM,
+                        num_hands=1,
+                        min_hand_detection_confidence=0.5,
+                        min_hand_presence_confidence=0.5,
+                        min_tracking_confidence=0.5,
+                        result_callback=self.result_callback)
+                    self.landmarker = vision.HandLandmarker.create_from_options(fallback_options)
+                    self.using_gpu = False
+                    print("✅ CPU FALLBACK ACTIVE")
+
                 self.start_time = time.time()
                 self.last_timestamp_ms = 0
+                
+
 
             # Processing Loop Step
             try:
@@ -165,6 +177,11 @@ class HandEngine:
                 fps = self.profiler.get_fps()
                 cv2.putText(img, f"OPS: {int(fps)}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
                 
+                # STATUS HUD
+                status_color = (0, 255, 0) if self.using_gpu else (0, 165, 255) # Green for GPU, Orange for CPU
+                status_text = "GPU: ON" if self.using_gpu else "GPU: OFF (CPU)"
+                cv2.putText(img, status_text, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, status_color, 2)
+
                 local_result = None
                 with self.lock:
                     if self.latest_result:

@@ -38,6 +38,11 @@ class PerformanceProfiler:
             return 1000 / avg_frame_time if avg_frame_time > 0 else 0
         return 0
 
+    def get_inference_time(self):
+        if self.metrics['inference']:
+            return np.mean(list(self.metrics['inference']))
+        return 0
+
 # ============================================================================
 # 2. ADAPTIVE FILTERING
 # ============================================================================
