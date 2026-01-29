@@ -1,4 +1,5 @@
 import flet as ft
+from src.skeleton_assets import SkeletonAssets
 
 class GesturesView(ft.Column):
     def __init__(self, main_app=None):
@@ -26,7 +27,7 @@ class GesturesView(ft.Column):
                             "Le curseur suit votre index. Gardez la main détendue.",
                             "M", 
                             ft.Colors.CYAN_400,
-                            "assets/gestures/palm.svg"
+                            (255, 255, 0) # Cyan BGR
                         ),
                         
                         # --- CLIC ---
@@ -36,7 +37,7 @@ class GesturesView(ft.Column):
                             "Rapprochez le pouce et l'index (< 4cm).",
                             "M",
                             ft.Colors.AMBER_400,
-                            "assets/gestures/pinch.svg"
+                            (0, 200, 255) # Amber/Orange BGR
                         ),
                         
                         # --- FIST (Future Scroll) ---
@@ -46,7 +47,7 @@ class GesturesView(ft.Column):
                             "Fermez la main pour activer le défilement (Secondary Hand).",
                             "S",
                             ft.Colors.PURPLE_400,
-                            "assets/gestures/fist.svg"
+                            (255, 0, 255) # Purple BGR
                         ),
                         
                         # --- PEACE ---
@@ -56,7 +57,7 @@ class GesturesView(ft.Column):
                             "Prise de screenshot ou action rapide personnalisée.",
                             "S",
                             ft.Colors.GREEN_400,
-                            "assets/gestures/peace.svg"
+                            (0, 255, 0) # Green BGR
                         ),
                         
                         # --- THUMBS UP ---
@@ -66,7 +67,7 @@ class GesturesView(ft.Column):
                             "Valider une boîte de dialogue ou dire OK au système.",
                             "S",
                             ft.Colors.BLUE_400,
-                            "assets/gestures/thumbs_up.svg"
+                            (255, 0, 0) # Blue BGR
                         ),
 
                         # --- STOP ---
@@ -76,7 +77,7 @@ class GesturesView(ft.Column):
                             "Quitter instantanément le moteur de détection AI.",
                             "ESC",
                             ft.Colors.RED_400,
-                            ft.Icons.POWER_SETTINGS_NEW # Fallback icon for non-hand
+                            ft.Icons.POWER_SETTINGS_NEW # Fallback icon
                         ),
 
                     ], spacing=20, run_spacing=20),
@@ -85,29 +86,42 @@ class GesturesView(ft.Column):
             )
         ]
 
-    def _build_premium_card(self, title, gesture, description, tag, theme_color, image_path):
-        """Construction d'une carte au look 'Expressif' & Moderne avec mains SVG."""
-        
-        # Check if image_path is an SVG file or a Material Icon name
-        is_svg = isinstance(image_path, str) and image_path.endswith(".svg")
+    def _build_premium_card(self, title, gesture, description, tag, theme_color, image_or_color):
+        """Construction d'une carte avec Squelette 3D généré ou Icône."""
         
         visual_content = None
-        if is_svg:
-            visual_content = ft.Image(
-                src=image_path,
-                width=80,
-                height=80,
-                color=theme_color,
-                fit=ft.BoxFit.CONTAIN,
+        
+        # If image_or_color is a Tuple (BGR), we generate the skeleton
+        if isinstance(image_or_color, tuple):
+            bgr_color = image_or_color
+            # Generate Base64 Image (Ultra Max resolution)
+            skel_b64 = SkeletonAssets.generate_image(
+                gesture, 
+                width=450, 
+                height=450, 
+                color=bgr_color,
+                thickness=6
             )
+            visual_content = ft.Image(
+                src=f"data:image/png;base64,{skel_b64}",
+                width=260,
+                height=260,
+                fit=ft.BoxFit.CONTAIN,
+                gapless_playback=True 
+            )
+        # Else if it's an Icon (for STOP button etc)
+        elif isinstance(image_or_color, str) and not image_or_color.endswith(".svg"):
+             visual_content = ft.Icon(image_or_color, size=160, color=theme_color)
         else:
-            visual_content = ft.Icon(image_path, size=60, color=theme_color)
+            # Fallback
+            visual_content = ft.Icon(ft.Icons.HELP_OUTLINE, size=160, color=theme_color)
 
         return ft.Container(
             col={"sm": 12, "md": 6, "lg": 4},
+            height=480, # Fixed Height
             bgcolor="#232529",
             border_radius=20,
-            padding=30,
+            padding=20,
             border=ft.border.all(1, ft.Colors.with_opacity(0.1, ft.Colors.WHITE)),
             on_hover=lambda e: self._handle_hover(e, theme_color),
             shadow=ft.BoxShadow(
@@ -124,31 +138,32 @@ class GesturesView(ft.Column):
                         border_radius=20,
                     ),
                     ft.Spacer() if hasattr(ft, "Spacer") else ft.Container(expand=True),
-                    ft.Icon(image_path if not is_svg else ft.Icons.FINGERPRINT, color=theme_color, size=20),
+                    # Small icon top right (Visual Flair)
+                    ft.Icon(ft.Icons.AUTO_GRAPH, color=theme_color, size=24),
                 ]),
                 
-                ft.Container(height=30),
+                ft.Container(height=5), # Minimal spacing top
                 
-                # Visual Centerpiece (SVG Hand)
+                # Visual Centerpiece (Skeleton Hand) - UBER MAXIMIZED
                 ft.Container(
                     content=ft.Stack([
                         # Outer Glow
                         ft.Container(
-                            width=120, height=120,
+                            width=280, height=280,
                             bgcolor=ft.Colors.with_opacity(0.05, theme_color),
-                            border_radius=60,
+                            border_radius=140,
                         ),
                         # Central Content
                         ft.Container(
                             content=visual_content,
-                            alignment=ft.alignment.Alignment(0, 0),
-                            width=120, height=120,
+                            alignment=ft.Alignment(0, 0),
+                            width=280, height=280,
                         )
                     ]),
-                    alignment=ft.alignment.Alignment(0, 0),
+                    alignment=ft.Alignment(0, 0),
                 ),
                 
-                ft.Container(height=30),
+                ft.Container(height=15), # Reduced spacing bottom
                 
                 ft.Text(title, size=14, color=theme_color, weight=ft.FontWeight.BOLD),
                 ft.Text(gesture, size=24, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
