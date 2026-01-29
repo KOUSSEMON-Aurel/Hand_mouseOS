@@ -233,11 +233,7 @@ class HandEngine:
                  
                  # --- PHASE 8: KEYBOARD MODE ---
                  if self.keyboard_enabled:  # Changed: Only process if enabled
-                     # Send index tip position to keyboard
-                     index_tip = primary_hand_landmarks[8]
-                     index_pos_px = (int(index_tip.x * w), int(index_tip.y * h))
-                     is_pinching = (primary_gesture == "PINCH")
-                     self.virtual_keyboard.check_input(index_pos_px, is_pinching)
+                      self.virtual_keyboard.process(primary_hand_landmarks, primary_gesture, img.shape)
                  
                  self.asl_manager.process(primary_hand_landmarks)
              else:

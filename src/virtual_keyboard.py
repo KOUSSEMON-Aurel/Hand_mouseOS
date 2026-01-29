@@ -169,3 +169,23 @@ class VirtualKeyboard:
             self.keyboard_controller.release(key.lower())
             
         print(f"⌨️ Typed: {key}")
+
+    def process(self, landmarks, gesture_name, frame_shape):
+        """
+        Main processing loop for the keyboard.
+        Calculates index position and delegates to check_input.
+        """
+        if not landmarks:
+            return False
+            
+        h, w, _ = frame_shape
+        
+        # Position Index (Landmark 8)
+        index_tip = landmarks[8]
+        index_pos_px = (int(index_tip.x * w), int(index_tip.y * h))
+        
+        # PINCH detection
+        is_pinching = (gesture_name == "PINCH")
+        
+        self.check_input(index_pos_px, is_pinching)
+        return True
