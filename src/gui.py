@@ -257,6 +257,13 @@ class AppGUI:
         )
         self.keyboard_mode_dropdown.on_change = lambda e: self.change_keyboard_mode(e)
         
+        # PHASE 8: Mouse Freeze Toggle
+        self.switch_mouse_freeze = ft.Switch(
+            label="❄️ Geler la Souris",
+            value=False,
+            on_change=lambda e: self.toggle_mouse_freeze(e)
+        )
+        
         self.switch_asl = ft.Switch(
             label="🤟 Langue des Signes (ASL)",
             value=False,
@@ -308,6 +315,7 @@ class AppGUI:
                                 ft.Text("Fonctionnalités", size=12, weight=ft.FontWeight.BOLD, color=ft.Colors.GREY_400),
                                 self.switch_keyboard,
                                 self.keyboard_mode_dropdown,
+                                self.switch_mouse_freeze,
                                 self.switch_asl
                             ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                             bgcolor="#2b2d31", padding=20, border_radius=15, width=280
@@ -363,11 +371,17 @@ class AppGUI:
         print(f"🔤 Clavier Virtuel: {'ACTIVÉ' if e.control.value else 'DÉSACTIVÉ'}")
     
     def change_keyboard_mode(self, e):
-        """
-Change le mode du clavier (DWELL ou PINCH)."""
-        self.engine.virtual_keyboard.mode = e.control.value
-        mode_name = "SURVOL (1s)" if e.control.value == "dwell" else "PINCER"
+        """Change le mode du clavier (DWELL ou PINCH)."""
+        new_mode = e.control.value
+        self.engine.virtual_keyboard.mode = new_mode
+        mode_name = "SURVOL (1s)" if new_mode == "dwell" else "PINCER"
         print(f"⌨️ Mode Clavier changé: {mode_name}")
+    
+    def toggle_mouse_freeze(self, e):
+        """Gel/Dégel la souris pour faciliter la frappe."""
+        self.engine.mouse_frozen = e.control.value
+        status = "GELÉE ❄️" if e.control.value else "DÉGELÉE ✅"
+        print(f"🕹️ Souris: {status}")
     
     def toggle_asl(self, e):
         """Active/Désactive la reconnaissance ASL."""
