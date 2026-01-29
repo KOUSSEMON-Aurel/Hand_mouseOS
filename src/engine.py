@@ -377,10 +377,16 @@ class HandEngine:
                                  if start_idx < len(lm_list) and end_idx < len(lm_list):
                                      cv2.line(img, lm_list[start_idx], lm_list[end_idx], (0, 255, 0), 2)
 
-                            # HUD for this Hand
+                            # HUD for this Hand - Use handedness (L/R)
                             gesture = local_gestures[i] if i < len(local_gestures) else "TRACKING"
-                            hand_label = "M" if i == 0 else "S" # Master / Secondary
-                            color = (0, 255, 0) if i == 0 else (255, 0, 255) # Primary Green, Secondary Purple
+                            
+                            # Get handedness from MediaPipe (Left/Right)
+                            hand_label = "?"
+                            if local_result.handedness and i < len(local_result.handedness):
+                                handedness = local_result.handedness[i][0].category_name
+                                hand_label = "L" if handedness == "Left" else "R"
+                            
+                            color = (0, 255, 0) if hand_label == "R" else (255, 0, 255)  # Green=Right, Purple=Left
                             
                             root_x, root_y = lm_list[0]
                             cv2.putText(img, f"[{hand_label}] {gesture}", (root_x - 20, root_y + 30), 
