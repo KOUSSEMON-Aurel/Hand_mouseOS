@@ -66,6 +66,12 @@ class HandEngine:
         self.inference_start_times = {} # Map timestamp_ms -> wall_time
         self.current_gestures = [] # NEW PHASE 4
 
+        # -----------------------------
+        
+        # Start persistent thread
+        self.thread = threading.Thread(target=self._run_loop, daemon=True)
+        self.thread.start()
+
     @property
     def asl_enabled(self):
         return self.asl_manager.enabled
@@ -73,13 +79,6 @@ class HandEngine:
     @asl_enabled.setter
     def asl_enabled(self, value):
         self.asl_manager.set_enabled(value)
-        
-        # --- NEW API SETUP (GPU Default, Fallback in Loop) ---
-        # ATTEMPT GPU
-        
-        # Start persistent thread
-        self.thread = threading.Thread(target=self._run_loop, daemon=True)
-        self.thread.start()
 
     def result_callback(self, result: vision.HandLandmarkerResult, output_image: mp.Image, timestamp_ms: int):
         # Only process if we are actually "processing" (avoid backlog callbacks)
