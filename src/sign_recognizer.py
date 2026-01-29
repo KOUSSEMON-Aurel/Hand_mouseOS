@@ -1,108 +1,105 @@
-import cv2
-import numpy as np
-import os
-import threading
-
-# Try importing tensorflow/keras, handle failure gracefully
-try:
-    from keras.models import load_model
-    from keras.preprocessing.image import img_to_array
-    HAS_TF = True
-except ImportError:
-    HAS_TF = False
-    print("⚠️ TensorFlow/Keras not found. ASL recognition will be disabled.")
+import math
 
 class SignLanguageInterpreter:
-    def __init__(self, model_path="cnn_model_keras2.h5"):
-        self.model = None
-        self.classes = self._get_classes()
-        self.is_loaded = False
+    """
+    Interpréteur de langue des signes (ASL) basé sur la géométrie des landmarks MediaPipe.
+    Ne nécessite PAS TensorFlow/Keras.
+    """
+    def __init__(self):
+        self.finger_tips = [4, 8, 12, 16, 20]
+        self.finger_pips = [2, 6, 10, 14, 18]
+
+    def predict(self, hand_crop_unused, landmarks):
+        """
+        Prediit la lettre ASL basée sur les landmarks normalisés.
         
-        if HAS_TF and os.path.exists(model_path):
-            print(f"🔄 Loading ASL Model from {model_path}...")
-            try:
-                self.model = load_model(model_path)
-                self.is_loaded = True
-                print("✅ ASL Model loaded successfully!")
-            except Exception as e:
-                print(f"❌ Failed to load ASL model: {e}")
-        elif not HAS_TF:
-             print("❌ TensorFlow missing. Run 'pip install tensorflow' to enable ASL.")
-        else:
-             print(f"⚠️ Model file {model_path} not found. ASL feature will be limited.")
-
-    def _get_classes(self):
-        # Classes from the repository (assuming A-Z + others)
-        # Typically folders are named 0, 1, ... or A, B, ... 
-        # For now, we'll map indices to generic labels based on the repo description (44 chars)
-        # Ideally this should match the training folders.
-        return {
-            0: 'A', 1: 'B', 2: 'C', 3: 'D', 4: 'E', 5: 'F', 6: 'G', 7: 'H', 
-            8: 'I', 9: 'J', 10: 'K', 11: 'L', 12: 'M', 13: 'N', 14: 'O', 15: 'P',
-            16: 'Q', 17: 'R', 18: 'S', 19: 'T', 20: 'U', 21: 'V', 22: 'W', 23: 'X',
-            24: 'Y', 25: 'Z', 
-            # Add more maps if the model supports digits/words
-        }
-
-    def predict(self, hand_image):
-        """
-        Predicts the sign from a cropped hand image.
         Args:
-            hand_image: Cropped BGR image of the hand
+            hand_crop_unused: Ignoré (legacy CNN signature)
+            landmarks: Liste des objets landmarks (x, y, z) de MediaPipe
+            
         Returns:
-            predicted_label (str), confidence (float)
+            label (str), confidence (float)
         """
-        if not self.is_loaded or self.model is None:
-            return "N/A", 0.0
+        if not landmarks:
+            return "Unknown", 0.0
 
-        try:
-            # Preprocessing as per repo (Resize to training size)
-            # Repo uses image_x, image_y (probably 50x50 or 64x64, checking code...)
-            # Code says: image_x, image_y = get_image_size() from 'gestures/1/100.jpg'
-            # We will assume 64x64 for standard CNNs, but valid size is crucial.
-            # Let's target 64x64 based on common practices if not specified.
-            target_size = (64, 64) 
-            
-            img = cv2.resize(hand_image, target_size)
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) # Often grayscale for shapes
-            
-            # Normalize
-            img = img.astype("float") / 255.0
-            img = img_to_array(img)
-            img = np.expand_dims(img, axis=0)
-            img = np.expand_dims(img, axis=3) # (1, 64, 64, 1)
+        # Analyse des doigts (Ouvert/Fermé)
+        fingers = []
+        
+        # Pouce (Axe X pour la main droite, inverser si main gauche - supposons main droite pour l'instant)
+        # Pouce ouvert si tip à droite de IP
+        if landmarks[4].x > landmarks[3].x:
+            fingers.append(1)
+        else:
+            fingers.append(0)
 
-            prediction = self.model.predict(img, verbose=0)
-            idx = np.argmax(prediction)
-            confidence = np.max(prediction)
+        # 4 autres doigts (Axe Y)
+        for i in range(1, 5):
+            if landmarks[self.finger_tips[i]].y < landmarks[self.finger_pips[i]].y:
+                fingers.append(1)
+            else:
+                fingers.append(0)
+
+        # Classification simple basée sur les doigts levés
+        # [Pouce, Index, Majeur, Annulaire, Auriculaire]
+        
+        # A: Poing fermé, pouce contre index (FIST avec pouce sur le côté)
+        # B: 4 doigts levés, pouce plié sur paume
+        # C: Main en C
+        # D: Index levé, autres ronds
+        # E: Tous pliés (griffes)
+        # F: OK sign (Index+Pouce joints, 3 levés)
+        # L: L shape (Pouce+Index levés)
+        # V: V (Index+Majeur)
+        # W: 3 doigts
+        # Y: Pouce + Auriculaire (Telephone)
+        
+        total_fingers = sum(fingers)
+        gesture = "Unknown"
+        conf = 0.8
+        
+        # Logique simplifiée (A améliorer avec des angles)
+        if fingers == [0, 1, 0, 0, 0]:
+            gesture = "D" # Ou POINTING
+        elif fingers == [0, 1, 1, 0, 0]:
+            gesture = "V"
+        elif fingers == [0, 1, 1, 1, 0]:
+            gesture = "W"
+        elif fingers == [0, 1, 1, 1, 1]:
+            gesture = "B" 
+        elif fingers == [1, 1, 0, 0, 0]:
+            gesture = "L"
+        elif fingers == [1, 0, 0, 0, 1]:
+            gesture = "Y"
+        elif fingers == [1, 1, 1, 1, 1]:
+            gesture = "FIVE" # ou P (Palm)
+        elif fingers == [0, 0, 0, 0, 0]:
+            # A, E, S, M, N se ressemblent en '00000', faut regarder le pouce et la position des tips
+            gesture = "A/E/S"
             
-            label = self.classes.get(idx, f"Rank-{idx}")
-            return label, float(confidence)
+            # Raffinement E vs A
+            # E: Tips proches du bas de la paume
+            # A: Pouce vertical contre la main
+            thumb_tip = landmarks[4]
+            index_mcp = landmarks[5]
             
-        except Exception as e:
-            print(f"Prediction Error: {e}")
-            return "ERR", 0.0
+            if thumb_tip.y < index_mcp.y: # Pouce un peu haut
+                gesture = "A"
+            else:
+                gesture = "E"
+                
+        elif fingers == [1, 0, 0, 0, 0]:
+             # Pouce levé ?
+             gesture = "THUMBS_UP" # Ou A ouvert
+        
+        # Detection PINCH / F (OK sign)
+        # Distance Pouce-Index faible + 3 doigts levés (Majeur, Annulaire, Auric)
+        dist_thumb_index = math.hypot(landmarks[4].x - landmarks[8].x, landmarks[4].y - landmarks[8].y)
+        if dist_thumb_index < 0.05 and fingers[2]==1 and fingers[3]==1 and fingers[4]==1:
+            gesture = "F"
+
+        return gesture, conf
 
     def preprocess_hand_region(self, frame, landmarks):
-        """
-        Extracts and preprocesses the hand region from the full frame.
-        """
-        h, w, _ = frame.shape
-        # Compute bounding box from landmarks
-        x_min = min([lm.x for lm in landmarks]) * w
-        x_max = max([lm.x for lm in landmarks]) * w
-        y_min = min([lm.y for lm in landmarks]) * h
-        y_max = max([lm.y for lm in landmarks]) * h
-        
-        # Add padding
-        padding = 20
-        x_min = max(0, int(x_min - padding))
-        x_max = min(w, int(x_max + padding))
-        y_min = max(0, int(y_min - padding))
-        y_max = min(h, int(y_max + padding))
-        
-        if x_max - x_min < 10 or y_max - y_min < 10:
-            return None # Box too small
-            
-        hand_crop = frame[y_min:y_max, x_min:x_max]
-        return hand_crop
+        """Pass-through pour compatibilité."""
+        return frame # On n'a pas besoin de crop pour l'approche géométrique
