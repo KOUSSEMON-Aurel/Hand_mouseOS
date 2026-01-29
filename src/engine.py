@@ -9,6 +9,7 @@ import os
 from mouse_driver import MouseDriver
 from optimized_utils import CameraConfigurator, PerformanceProfiler
 from advanced_filter import HybridMouseFilter # NEW
+from gesture_classifier import StaticGestureClassifier # NEW PHASE 4
 
 class HandEngine:
     def __init__(self):
@@ -18,6 +19,7 @@ class HandEngine:
         self.running = True # Thread life flag
         self.mouse = MouseDriver()
         self.filter = HybridMouseFilter() # NEW: Initialize Filter
+        self.gesture_classifier = StaticGestureClassifier() # NEW PHASE 4
         
         # --- OPTIMIZATION: Profiler ---
         self.profiler = PerformanceProfiler()
@@ -26,6 +28,7 @@ class HandEngine:
         self.lock = threading.Lock()
         self.latest_result = None
         self.inference_start_times = {} # Map timestamp_ms -> wall_time
+        self.current_gestures = [] # NEW PHASE 4
         
         # --- NEW API SETUP (GPU Default, Fallback in Loop) ---
         # ATTEMPT GPU
@@ -63,30 +66,20 @@ class HandEngine:
                  latency = (time.time() - start_time) * 1000
                  self.profiler.metrics['inference'].append(latency)
 
-             primary_hand_landmarks = None
-             
              # Identify Primary Hand (Right Hand Preferred for Mouse)
-             # Note: MediaPipe Selfie Mode means 'Right' label might be your physical left if mirrored.
-             # We assume standard setup.
-             
-             # Simple Logic: First hand is primary unless we find a specific one?
-             # Let's iterate and find which one should control.
-             # For now, to keep it smooth and avoid jitter fighting:
-             # Just pick the FIRST hand in the list as the 'Pointer'.
-             # (MediaPipe usually keeps the order consistent-ish or tracking ID).
-             
-             # FUTURE UPGRADE: Use result.handedness to assign specific roles (Right=Mouse, Left=Shortcuts).
-             
+             temp_gestures = []
+
              # Loop through all detected hands
              for i, hand_landmarks in enumerate(result.hand_landmarks):
-                 # Get Handedness Label (if available)
+                 # 1. Classify Gesture
+                 gesture_label = self.gesture_classifier.classify(hand_landmarks)
+                 temp_gestures.append(gesture_label)
+
+                 # 2. Get Handedness Label (if available)
                  hand_label = "Unknown"
                  if result.handedness and i < len(result.handedness):
-                     # handedness[i] is a list of categories (usually 1)
                      hand_label = result.handedness[i][0].category_name
                  
-                 # Logic: Index 0 is Primary (Mouse) for now.
-                 # Later we can check "if hand_label == 'Right': ..."
                  is_primary = (i == 0) 
                  
                  h, w = 480, 640
@@ -101,6 +94,8 @@ class HandEngine:
                      
                      if is_primary:
                          # --- MOUSE CONTROL (Primary Only) ---
+                         # Use Gesture for better click detection? (Future)
+                         # For now keep distance based for compatibility
                          if distance < 40: # Click
                              self.mouse.click()
                          else: # Move
@@ -109,10 +104,11 @@ class HandEngine:
                              smooth_x, smooth_y = self.filter.process(raw_x, raw_y, ts_seconds)
                              self.mouse.move(smooth_x, smooth_y, w, h, timestamp=ts_seconds)
                      else:
-                         # --- SECONDARY HAND (Gestures/Signs Only) ---
-                         # Placeholder for future logic
-                         # e.g. "If Fist -> Scroll Down"
+                         # SECONDARY HAND: Sign language preparation
                          pass
+             
+             with self.lock:
+                 self.current_gestures = temp_gestures
 
 
     def start(self):
@@ -233,13 +229,16 @@ class HandEngine:
                 cv2.putText(img, status_text, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, status_color, 2)
 
                 local_result = None
+                local_gestures = []
                 with self.lock:
                     if self.latest_result:
                          local_result = self.latest_result
+                         local_gestures = self.current_gestures
                 
                 if local_result and local_result.hand_landmarks:
                     h, w, c = img.shape
-                    for hand_landmarks in local_result.hand_landmarks:
+                    for i, hand_landmarks in enumerate(local_result.hand_landmarks):
+                        # Hand Connections (Simplified)
                         CONNECTIONS = frozenset([
                             (0, 1), (1, 2), (2, 3), (3, 4),
                             (0, 5), (5, 6), (6, 7), (7, 8),
@@ -259,22 +258,14 @@ class HandEngine:
                              if start_idx < len(lm_list) and end_idx < len(lm_list):
                                  cv2.line(img, lm_list[start_idx], lm_list[end_idx], (0, 255, 0), 2)
 
-                        if len(lm_list) > 12:
-                            x1, y1 = lm_list[8]
-                            x2, y2 = lm_list[4]
-                            distance = self._get_distance(lm_list[8], lm_list[4])
-                            
-                            color = (0, 255, 0)
-                            gesture_name = "POINTER"
-                            if distance < 40:
-                                color = (0, 0, 255)
-                                gesture_name = "PINCH"
-                                cv2.circle(img, (x1, y1), 10, color, cv2.FILLED)
-                            
-                            cv2.line(img, (x1, y1), (x2, y2), (255, 0, 0), 2)
-                            
-                            # HUD
-                            cv2.putText(img, f"MODE: {gesture_name}", (30, 400), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+                        # HUD for this Hand
+                        gesture = local_gestures[i] if i < len(local_gestures) else "TRACKING"
+                        hand_label = "M" if i == 0 else "S" # Master / Secondary
+                        color = (0, 255, 0) if i == 0 else (255, 0, 255) # Primary Green, Secondary Purple
+                        
+                        root_x, root_y = lm_list[0]
+                        cv2.putText(img, f"[{hand_label}] {gesture}", (root_x - 20, root_y + 30), 
+                                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
                 # 4. Show Native Window
                 cv2.imshow(window_name, img)
