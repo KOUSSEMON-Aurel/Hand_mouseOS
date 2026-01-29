@@ -14,6 +14,7 @@ class HandEngine:
     def __init__(self):
         self.cap = None
         self.is_processing = False # Control flag
+        self.is_processing = False # Control flag
         self.running = True # Thread life flag
         self.mouse = MouseDriver()
         self.filter = HybridMouseFilter() # NEW: Initialize Filter
@@ -24,6 +25,7 @@ class HandEngine:
         # Async Result Storage
         self.lock = threading.Lock()
         self.latest_result = None
+        self.inference_start_times = {} # Map timestamp_ms -> wall_time
         
         # --- NEW API SETUP (GPU Default, Fallback in Loop) ---
         # ATTEMPT GPU
@@ -55,6 +57,12 @@ class HandEngine:
             self.latest_result = result
             
         if result.hand_landmarks:
+             # Calculate Latency
+             start_time = self.inference_start_times.pop(timestamp_ms, None)
+             if start_time:
+                 latency = (time.time() - start_time) * 1000
+                 self.profiler.metrics['inference'].append(latency)
+
              for hand_landmarks in result.hand_landmarks:
                 h, w = 480, 640
                 lm_list = []
@@ -72,7 +80,8 @@ class HandEngine:
                          # APPLY HYBRID FILTER
                          raw_x, raw_y = lm_list[8]
                          smooth_x, smooth_y = self.filter.process(raw_x, raw_y, ts_seconds)
-                         print(f"📍 ENGINE: Request Move {smooth_x:.1f}, {smooth_y:.1f}")
+                         
+                         # print(f"📍 ENGINE: Request Move {smooth_x:.1f}, {smooth_y:.1f}")
                          self.mouse.move(smooth_x, smooth_y, w, h, timestamp=ts_seconds)
 
 
@@ -168,6 +177,17 @@ class HandEngine:
                 self.last_timestamp_ms = timestamp_ms
                 
                 if self.landmarker:
+                    # TRACKING: Store wall time for this timestamp
+                    self.inference_start_times[timestamp_ms] = time.time()
+                    
+                    # Cleanup old timestamps (prevent memory leak)
+                    if len(self.inference_start_times) > 100:
+                        # Remove keys older than 1 second (approx)
+                        cutoff = timestamp_ms - 2000 
+                        keys_to_remove = [k for k in self.inference_start_times.keys() if k < cutoff]
+                        for k in keys_to_remove:
+                            del self.inference_start_times[k]
+                            
                     self.landmarker.detect_async(mp_image, timestamp_ms)
                 
                 self.profiler.mark('inference_sent')

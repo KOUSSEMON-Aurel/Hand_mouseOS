@@ -184,65 +184,7 @@ class AdaptiveSensitivityMapper:
         # Scale to screen
         return int(x_final * self.screen_width), int(y_final * self.screen_height)
 
-class CalibrationSystem:
-    """Système de calibration 4-points pour mapping caméra→écran"""
-    
-    def __init__(self, screen_width: int = 1920, screen_height: int = 1080):
-        self.screen_width = screen_width
-        self.screen_height = screen_height
-        self.transform_matrix = None
-        self.is_calibrated = False
-    
-    def calibrate(self, camera_points: List[Tuple[float, float]]) -> bool:
-        """
-        Effectuer la calibration
-        Args:
-            camera_points: 4 points détectés par la caméra [top-left, top-right, bottom-right, bottom-left]
-        """
-        if len(camera_points) != 4:
-            return False
-        
-        # Points cibles à l'écran (coins)
-        screen_points = [
-            (0, 0),
-            (self.screen_width, 0),
-            (self.screen_width, self.screen_height),
-            (0, self.screen_height)
-        ]
-        
-        # Convertir en numpy
-        src_pts = np.float32(camera_points)
-        dst_pts = np.float32(screen_points)
-        
-        # Calculer transformation perspective
-        self.transform_matrix = cv2.getPerspectiveTransform(src_pts, dst_pts)
-        self.is_calibrated = True
-        
-        return True
-    
-    def apply(self, x: float, y: float) -> Tuple[float, float]:
-        """Appliquer la transformation calibrée"""
-        if not self.is_calibrated:
-            # Pas calibré → mapping simple
-            return x * self.screen_width, y * self.screen_height
-        
-        # Appliquer transformation perspective
-        point = np.array([[[x, y]]], dtype=np.float32)
-        transformed = cv2.perspectiveTransform(point, self.transform_matrix)
-        
-        return float(transformed[0][0][0]), float(transformed[0][0][1])
-    
-    def save(self, filepath: str):
-        if self.is_calibrated:
-            np.save(filepath, self.transform_matrix)
-    
-    def load(self, filepath: str) -> bool:
-        try:
-            self.transform_matrix = np.load(filepath)
-            self.is_calibrated = True
-            return True
-        except:
-            return False
+
 
 # ============================================================================
 # 5. VISUAL FEEDBACK & EXTRAS

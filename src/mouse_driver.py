@@ -21,7 +21,6 @@ class MouseDriver:
         # --- OPTIMIZATION INTEGRATION ---
         self.filter = AdaptiveOneEuroFilter()
         self.mapper = AdaptiveSensitivityMapper(self.sw, self.sh, gamma=1.3)
-        # self.calibration removed
         # -------------------------------
         
         self.mode = "pyautogui"
@@ -57,12 +56,17 @@ class MouseDriver:
         if time.time() < self.frozen_until:
             return
 
+        if self.os_name == "Linux" and UINPUT_AVAILABLE:
+            # UInput works with absolute coordinates [0, SW]
+            # No normalization needed if we map incorrectly earlier.
+            pass
+
         # 1. Normalize Coordinates [0, 1]
         norm_x = x / frame_w
         norm_y = y / frame_h
         
-        # 2. Map directly to Screen Coordinates using Smart Mapper (Non-linear)
-        # Calibration removed by user request - Back to standard mapping
+        # 2. Map to Screen with Smart/Adaptive Scaling
+        # We assume the user wants the camera FoV to cover the screen
         target_x, target_y = self.mapper.map(norm_x, norm_y)
 
         # 3. Apply Adaptive Filter (Smart Smoothing)
@@ -99,3 +103,5 @@ class MouseDriver:
         # With adaptive filter, internal logic handles most cases.
         normalized = max(0.001, (21 - value) * 0.001) 
         self.filter.MEDIUM_CUTOFF = normalized
+
+
