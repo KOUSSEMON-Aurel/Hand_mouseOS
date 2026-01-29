@@ -7,6 +7,7 @@ import time
 import math
 import os
 from mouse_driver import MouseDriver
+from optimized_utils import CameraConfigurator, PerformanceProfiler
 
 class HandEngine:
     def __init__(self):
@@ -15,6 +16,9 @@ class HandEngine:
         self.running = True # Thread life flag
         self.mouse = MouseDriver()
         
+        # --- OPTIMIZATION: Profiler ---
+        self.profiler = PerformanceProfiler()
+        # -----------------------------
         # Async Result Storage
         self.lock = threading.Lock()
         self.latest_result = None
@@ -77,6 +81,11 @@ class HandEngine:
         self.landmarker = None
         window_name = "Hand Mouse AI"
         
+        # --- OPTIMIZATION: Configure Camera Hardware ---
+        print("DEBUG: Configuring Camera Hardware...")
+        CameraConfigurator.configure_camera() # Forces Exposure/Focus settings
+        # -----------------------------------------------
+        
         while self.running:
             if not self.is_processing:
                 # IDLE STATE: Release resources if they are open
@@ -106,10 +115,14 @@ class HandEngine:
 
             # Processing Loop Step
             try:
+                self.profiler.mark('start')
+                
                 success, img = self.cap.read()
                 if not success:
                     time.sleep(0.1)
                     continue
+
+                self.profiler.mark('capture')
 
                 # 1. Flip & Convert
                 img = cv2.flip(img, 1)
@@ -124,12 +137,13 @@ class HandEngine:
                 
                 if self.landmarker:
                     self.landmarker.detect_async(mp_image, timestamp_ms)
+                
+                self.profiler.mark('inference_sent')
 
                 # 3. Draw LATEST known result
-                curr_time = time.time()
-                fps = 1 / (curr_time - self.prev_fps_time) if (curr_time - self.prev_fps_time) > 0 else 0
-                self.prev_fps_time = curr_time
-                cv2.putText(img, f"FPS: {int(fps)}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                # FPS Calculation from Profiler
+                fps = self.profiler.get_fps()
+                cv2.putText(img, f"OPS: {int(fps)}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
                 
                 local_result = None
                 with self.lock:
@@ -178,11 +192,16 @@ class HandEngine:
                 # 4. Show Native Window
                 cv2.imshow(window_name, img)
                 
+                self.profiler.mark('end')
+                self.profiler.measure('total', 'start', 'end')
+                
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     self.stop()
                     
             except Exception as e:
-                print(f"Error in Engine Loop: {e}")
+                import traceback
+                print("Error in Engine Loop (Recovering...):")
+                traceback.print_exc()
                 time.sleep(0.1)
 
     def set_smoothing(self, value):
