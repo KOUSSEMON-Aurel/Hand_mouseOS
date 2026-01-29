@@ -2,13 +2,6 @@ import math
 from typing import List, Tuple, Dict
 from enum import Enum
 
-# Optimisation Rust si disponible
-try:
-    from rust_core import pinch_distance as rust_pinch
-    RUST_AVAILABLE = True
-except ImportError:
-    RUST_AVAILABLE = False
-
 class Gesture(Enum):
     """Les gestes universels du système simplifié."""
     POINTING = "POINTING"       # 👆 Index tendu seul
