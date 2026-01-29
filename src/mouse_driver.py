@@ -38,6 +38,7 @@ class MouseDriver:
                     uinput.BTN_RIGHT,
                     uinput.ABS_X + (0, self.sw, 0, 0),
                     uinput.ABS_Y + (0, self.sh, 0, 0),
+                    uinput.REL_WHEEL, # Scrolling support
                 )
                 self.device = uinput.Device(events, name="Hand Mouse Output")
                 self.mode = "uinput"
@@ -97,6 +98,29 @@ class MouseDriver:
         else:
             pyautogui.click()
             
+    def right_click(self):
+        # STABILITY: Freeze for right click too
+        self.frozen_until = time.time() + 0.2
+        
+        if self.mode == "uinput" and hasattr(self, 'device'):
+            self.device.emit(uinput.BTN_RIGHT, 1)
+            self.device.emit(uinput.BTN_RIGHT, 0)
+        else:
+            pyautogui.rightClick()
+            
+    def scroll(self, dx, dy):
+        """
+        Scrolling action.
+        dx: Horizontal scroll (not supported by REL_WHEEL standard usually, ignored for now)
+        dy: Vertical scroll (+1 UP, -1 DOWN)
+        """
+        if self.mode == "uinput" and hasattr(self, 'device'):
+            # uinput REL_WHEEL: +1 is UP, -1 is DOWN
+            self.device.emit(uinput.REL_WHEEL, int(dy * 5)) # Multiplier for speed
+        else:
+            # PyAutoGUI scroll: amount of clicks
+            pyautogui.scroll(int(dy * 50))
+
     def set_smoothing(self, value):
         # Value 1-20 from slider.
         # Map to filter strength if needed.
