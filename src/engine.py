@@ -17,7 +17,9 @@ from src.gesture_classifier import StaticGestureClassifier # Refactored
 from src.context_mode import ContextModeDetector, ContextMode # NEW
 from src.action_dispatcher import ActionDispatcher, ActionType # NEW
 from src.feedback_overlay import FeedbackOverlay # NEW
+from src.feedback_overlay import FeedbackOverlay # NEW
 from src.virtual_keyboard import VirtualKeyboard # PHASE 8
+from src.sign_recognizer import SignLanguageInterpreter # PHASE 8: ASL
 
 class HandEngine:
     def __init__(self, headless=False):
@@ -36,11 +38,13 @@ class HandEngine:
         self.action_dispatcher = ActionDispatcher()
         self.feedback_overlay = FeedbackOverlay(position="top_left")
         self.virtual_keyboard = VirtualKeyboard(layout="azerty", mode="dwell")  # PHASE 8
+        self.sign_interpreter = SignLanguageInterpreter() # PHASE 8: ASL
         
         # PHASE 8: Feature Flags (controlled by GUI)
         self.keyboard_enabled = False
         self.asl_enabled = False
         self.mouse_frozen = False  # NEW: Freeze mouse for typing
+        self.last_asl_prediction = "" # Store last prediction
         
         # Gesture detection state for freeze toggle
         self._freeze_gesture_frames = 0
@@ -504,12 +508,21 @@ class HandEngine:
                     display_gesture = "UNKNOWN"
                     if local_gestures:
                         display_gesture = local_gestures[0] # Assuming Primary logic
+                    
+                    # Hack: Pass raw gesture to overlay for debug
+                    self.feedback_overlay.debug_raw_gesture = display_gesture
+                    
+                    display_action = self.action_dispatcher.get_action_info(local_action)["emoji"] + " " + self.action_dispatcher.get_action_info(local_action)["name"]
+                    
+                    # Override Display Action if ASL is ON
+                    if self.asl_enabled:
+                        display_action = f"ASL: {self.last_asl_prediction}"
                         
                     img = self.feedback_overlay.draw(
                         frame=img,
                         mode=local_mode.value,
                         gesture=display_gesture,
-                        action=self.action_dispatcher.get_action_info(local_action)["emoji"] + " " + self.action_dispatcher.get_action_info(local_action)["name"],
+                        action=display_action,
                         confidence=1.0 # Placeholder
                     )
                     

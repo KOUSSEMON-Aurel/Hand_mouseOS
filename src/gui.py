@@ -267,8 +267,7 @@ class AppGUI:
         self.switch_asl = ft.Switch(
             label="🤟 Langue des Signes (ASL)",
             value=False,
-            on_change=lambda e: self.toggle_asl(e),
-            disabled=True  # Not implemented yet
+            on_change=lambda e: self.toggle_asl(e)
         )
 
 

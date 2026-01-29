@@ -107,7 +107,7 @@ class FeedbackOverlay:
         
         # Texte : Geste
         gesture_icon = self.GESTURE_ICONS.get(gesture.upper(), "[?]")
-        cv2.putText(frame, f"Geste: {gesture_icon} {gesture}", (x + 10, y + 50), 
+        cv2.putText(frame, f"Geste: {gesture_icon} {gesture} ({getattr(self, 'debug_raw_gesture', '')})", (x + 10, y + 50), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
         
         # Texte : Action (si fournie)
