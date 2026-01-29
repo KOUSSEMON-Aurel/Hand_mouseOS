@@ -522,6 +522,7 @@ class HandEngine:
                     if self.asl_enabled:
                         overlay_mode = "asl"
                         display_action = f"SIGNE: {self.asl_manager.get_display_text()}"
+                        display_gesture = self.asl_manager.last_prediction # Show sign in gesture line too
                         
                     img = self.feedback_overlay.draw(
                         frame=img,
