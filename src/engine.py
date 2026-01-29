@@ -35,7 +35,7 @@ class HandEngine:
         self.options = vision.HandLandmarkerOptions(
             base_options=base_options_gpu,
             running_mode=vision.RunningMode.LIVE_STREAM,
-            num_hands=1,
+            num_hands=2, # DUAL HAND SUPPORT
             min_hand_detection_confidence=0.5,
             min_hand_presence_confidence=0.5,
             min_tracking_confidence=0.5,
@@ -63,26 +63,56 @@ class HandEngine:
                  latency = (time.time() - start_time) * 1000
                  self.profiler.metrics['inference'].append(latency)
 
-             for hand_landmarks in result.hand_landmarks:
-                h, w = 480, 640
-                lm_list = []
-                for lm in hand_landmarks:
-                    px, py = int(lm.x * w), int(lm.y * h)
-                    lm_list.append((px, py))
-                
-                if len(lm_list) > 12:
-                    distance = self._get_distance(lm_list[8], lm_list[4])
-                    ts_seconds = timestamp_ms / 1000.0
-                    
-                    if distance < 40: # Click
-                        self.mouse.click()
-                    else: # Move
-                         # APPLY HYBRID FILTER
-                         raw_x, raw_y = lm_list[8]
-                         smooth_x, smooth_y = self.filter.process(raw_x, raw_y, ts_seconds)
-                         
-                         # print(f"📍 ENGINE: Request Move {smooth_x:.1f}, {smooth_y:.1f}")
-                         self.mouse.move(smooth_x, smooth_y, w, h, timestamp=ts_seconds)
+             primary_hand_landmarks = None
+             
+             # Identify Primary Hand (Right Hand Preferred for Mouse)
+             # Note: MediaPipe Selfie Mode means 'Right' label might be your physical left if mirrored.
+             # We assume standard setup.
+             
+             # Simple Logic: First hand is primary unless we find a specific one?
+             # Let's iterate and find which one should control.
+             # For now, to keep it smooth and avoid jitter fighting:
+             # Just pick the FIRST hand in the list as the 'Pointer'.
+             # (MediaPipe usually keeps the order consistent-ish or tracking ID).
+             
+             # FUTURE UPGRADE: Use result.handedness to assign specific roles (Right=Mouse, Left=Shortcuts).
+             
+             # Loop through all detected hands
+             for i, hand_landmarks in enumerate(result.hand_landmarks):
+                 # Get Handedness Label (if available)
+                 hand_label = "Unknown"
+                 if result.handedness and i < len(result.handedness):
+                     # handedness[i] is a list of categories (usually 1)
+                     hand_label = result.handedness[i][0].category_name
+                 
+                 # Logic: Index 0 is Primary (Mouse) for now.
+                 # Later we can check "if hand_label == 'Right': ..."
+                 is_primary = (i == 0) 
+                 
+                 h, w = 480, 640
+                 lm_list = []
+                 for lm in hand_landmarks:
+                     px, py = int(lm.x * w), int(lm.y * h)
+                     lm_list.append((px, py))
+                 
+                 if len(lm_list) > 12:
+                     distance = self._get_distance(lm_list[8], lm_list[4])
+                     ts_seconds = timestamp_ms / 1000.0
+                     
+                     if is_primary:
+                         # --- MOUSE CONTROL (Primary Only) ---
+                         if distance < 40: # Click
+                             self.mouse.click()
+                         else: # Move
+                             # APPLY HYBRID FILTER
+                             raw_x, raw_y = lm_list[8]
+                             smooth_x, smooth_y = self.filter.process(raw_x, raw_y, ts_seconds)
+                             self.mouse.move(smooth_x, smooth_y, w, h, timestamp=ts_seconds)
+                     else:
+                         # --- SECONDARY HAND (Gestures/Signs Only) ---
+                         # Placeholder for future logic
+                         # e.g. "If Fist -> Scroll Down"
+                         pass
 
 
     def start(self):
@@ -140,7 +170,7 @@ class HandEngine:
                     fallback_options = vision.HandLandmarkerOptions(
                         base_options=base_options_cpu,
                         running_mode=vision.RunningMode.LIVE_STREAM,
-                        num_hands=1,
+                        num_hands=2, # DUAL HAND SUPPORT
                         min_hand_detection_confidence=0.5,
                         min_hand_presence_confidence=0.5,
                         min_tracking_confidence=0.5,
