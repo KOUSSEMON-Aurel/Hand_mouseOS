@@ -506,6 +506,8 @@ class HandEngine:
                     if self.keyboard_enabled:
                         # Create keyboard canvas (separate from main video)
                         keyboard_canvas = self.virtual_keyboard.draw(np.zeros((480, 960, 3), dtype=np.uint8))
+                        # Create window without toolbar
+                        cv2.namedWindow("Virtual Keyboard", cv2.WINDOW_GUI_NORMAL)
                         cv2.imshow("Virtual Keyboard", keyboard_canvas)
                     else:
                         # Close keyboard window if it exists

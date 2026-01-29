@@ -245,6 +245,18 @@ class AppGUI:
             on_change=lambda e: self.toggle_keyboard(e)
         )
         
+        # PHASE 8: Keyboard Mode Selector
+        self.keyboard_mode_dropdown = ft.Dropdown(
+            label="Mode Clavier",
+            value="dwell",
+            options=[
+                ft.dropdown.Option("dwell", "SURVOL (Attendre 1s)"),
+                ft.dropdown.Option("pinch", "PINCER (Pouce+Index)")
+            ],
+            width=200,
+            on_change=lambda e: self.change_keyboard_mode(e)
+        )
+        
         self.switch_asl = ft.Switch(
             label="🤟 Langue des Signes (ASL)",
             value=False,
@@ -295,9 +307,10 @@ class AppGUI:
                                 ft.Divider(height=10, color=ft.Colors.GREY_800),
                                 ft.Text("Fonctionnalités", size=12, weight=ft.FontWeight.BOLD, color=ft.Colors.GREY_400),
                                 self.switch_keyboard,
+                                self.keyboard_mode_dropdown,
                                 self.switch_asl
                             ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                            bgcolor="#2b2d31", padding=20, border_radius=15, width=250
+                            bgcolor="#2b2d31", padding=20, border_radius=15, width=280
                         ),
                     ])
                 ], spacing=20, alignment=ft.MainAxisAlignment.START)
@@ -348,6 +361,13 @@ class AppGUI:
         
         self.engine.keyboard_enabled = e.control.value
         print(f"🔤 Clavier Virtuel: {'ACTIVÉ' if e.control.value else 'DÉSACTIVÉ'}")
+    
+    def change_keyboard_mode(self, e):
+        """
+Change le mode du clavier (DWELL ou PINCH)."""
+        self.engine.virtual_keyboard.mode = e.control.value
+        mode_name = "SURVOL (1s)" if e.control.value == "dwell" else "PINCER"
+        print(f"⌨️ Mode Clavier changé: {mode_name}")
     
     def toggle_asl(self, e):
         """Active/Désactive la reconnaissance ASL."""
