@@ -1,144 +1,147 @@
 import flet as ft
 from engine import HandEngine
-import base64
+from calibration_view import CalibrationView
 
 class AppGUI:
     def __init__(self, page: ft.Page):
         self.page = page
-        self.page.title = "Hand_mouseOS"
+        self.page.title = "Hand Mouse OS - Master Control"
         self.page.theme_mode = ft.ThemeMode.DARK
         self.page.padding = 0
-        self.page.window_width = 1200
-        self.page.window_height = 800
-        # self.page.bgcolor = "#0b0f14" # Dark background from AppShell
-
-        self.img_control = ft.Image(
-            src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
-            width=640,
-            height=480,
-            fit="contain",
-        )
+        self.page.bgcolor = "#1a1c21"
         
-        # Engine setup
         self.engine = HandEngine()
         
-        self.setup_ui()
-
-    def on_frame(self, b64_str):
-        self.img_control.src = f"data:image/jpeg;base64,{b64_str}"
-        self.img_control.update()
-
-    def setup_ui(self):
-        # --- Sidebar ---
-        rail = ft.NavigationRail(
+        # Navigation State
+        self.current_view_index = 0
+        
+        self.init_components()
+        self.build_layout()
+        self.render_view(0)
+        
+    def init_components(self):
+        # Sidebar items
+        self.menu_items = [
+            ft.NavigationRailDestination(
+                icon=ft.Icons.DASHBOARD_OUTLINED,
+                selected_icon=ft.Icons.DASHBOARD,
+                label="Tableau de bord"
+            ),
+            ft.NavigationRailDestination(
+                icon=ft.Icons.SETTINGS_OVERSCAN_OUTLINED,
+                selected_icon=ft.Icons.SETTINGS_OVERSCAN,
+                label="Calibration"
+            ),
+            ft.NavigationRailDestination(
+                icon=ft.Icons.SETTINGS_OUTLINED,
+                selected_icon=ft.Icons.SETTINGS,
+                label="Paramètres"
+            ),
+        ]
+        
+        self.rail = ft.NavigationRail(
             selected_index=0,
             label_type=ft.NavigationRailLabelType.ALL,
             min_width=100,
-            min_extended_width=400,
-            # bgcolor="#151a21", # Sidebar color
-            group_alignment=-0.9,
-            destinations=[
-                ft.NavigationRailDestination(
-                    icon=ft.Icons.VIDEOCAM_OUTLINED, 
-                    selected_icon=ft.Icons.VIDEOCAM, 
-                    label="Live View"
-                ),
-                ft.NavigationRailDestination(
-                    icon=ft.Icons.GESTURE, 
-                    selected_icon=ft.Icons.GESTURE, 
-                    label="Gestures"
-                ),
-                ft.NavigationRailDestination(
-                    icon=ft.Icons.SETTINGS_OUTLINED, 
-                    selected_icon=ft.Icons.SETTINGS, 
-                    label="Settings"
-                ),
-            ],
-            on_change=self.on_nav_change
+            min_extended_width=200,
+            destinations=self.menu_items,
+            on_change=self.on_nav_change,
+            bgcolor="#2b2d31",
         )
-
-        # --- Content Area ---
-        self.content_area = ft.Column(expand=True, alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
         
-        # Initial Content (Live View)
-        self.build_live_view()
+        # Main Content Area
+        self.content_area = ft.Column(expand=True, scroll="auto")
+        # Defer rendering until attached
 
-        # --- Main Layout ---
-        layout = ft.Row(
-            [
-                rail,
-                ft.VerticalDivider(width=1),
-                self.content_area,
-            ],
-            expand=True,
-        )
-
-        self.page.add(layout)
-    
     def on_nav_change(self, e):
+        idx = e.control.selected_index
+        self.render_view(idx)
+
+    def render_view(self, idx):
         self.content_area.controls.clear()
-        if e.control.selected_index == 0:
-            self.build_live_view()
-        elif e.control.selected_index == 1:
-            self.content_area.controls.append(ft.Text("Gestures Config (Coming Soon)", size=30))
-        elif e.control.selected_index == 2:
-            self.build_settings_view()
         
-        self.content_area.update()
+        if idx == 0:
+            self.build_live_view()
+        elif idx == 1:
+            self.content_area.controls.append(CalibrationView(self))
+        elif idx == 2:
+            self.content_area.controls.append(
+                ft.Container(
+                    content=ft.Text("Paramètres avancés (À venir dans v1.1)", size=20, color=ft.Colors.GREY_500),
+                    alignment=ft.alignment.center,
+                    padding=50
+                )
+            )
+            
+        if self.content_area.page:
+            self.content_area.update()
+        
+    def go_home(self):
+        self.rail.selected_index = 0
+        self.rail.update()
+        self.render_view(0)
 
     def build_live_view(self):
         # Controls
-        self.btn_start = ft.ElevatedButton(
-            content=ft.Text("Start System"),
-            icon=ft.Icons.PLAY_ARROW,
-            on_click=lambda e: self.toggle_engine(e)
-        )
+        icon = ft.Icons.PLAY_ARROW
+        text = "Start System"
+        color = ft.Colors.BLUE_400
         
         if self.engine.is_processing:
-             self.btn_start.content = ft.Text("Stop System")
-             self.btn_start.icon = ft.Icons.STOP
-             self.btn_start.bgcolor = ft.Colors.RED_400
+             icon = ft.Icons.STOP
+             text = "Stop System"
+             color = ft.Colors.RED_400
 
-        self.content_area.controls.extend([
-            ft.Text("Hand Mouse Control", size=30, weight=ft.FontWeight.BOLD),
-            ft.Text("Camera feed opens in a separate native window for zero-latency performance.", italic=True),
-            ft.Container(height=20),
-            ft.Card(
-                content=ft.Container(
-                    content=ft.Column(
-                        [
-                            ft.Icon(ft.Icons.VIDEOCAM_OUTLINED, size=50, color=ft.Colors.GREEN),
-                            ft.Text("Video Engine Status", size=20, weight=ft.FontWeight.BOLD),
-                            self.btn_start,
-                            ft.Text("Press 'q' in the video window to stop", size=12, color=ft.Colors.GREY_500)
-                        ],
-                        alignment=ft.MainAxisAlignment.CENTER,
-                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                        spacing=20
-                    ),
-                    padding=40,
-                )
+        self.btn_start = ft.ElevatedButton(
+            content=ft.Text(text),
+            icon=icon,
+            bgcolor=color,
+            on_click=lambda e: self.toggle_engine(e),
+            style=ft.ButtonStyle(
+                shape=ft.RoundedRectangleBorder(radius=10),
+                padding=20,
             )
-        ])
+        )
 
-    def build_settings_view(self):
-        def on_smooth_change(e):
-            val = int(e.control.value)
-            self.engine.mouse.set_smoothing(val)
-            lbl.value = f"Smoothing Factor: {val}"
-            self.page.update()
-
-        slider = ft.Slider(min=1, max=20, divisions=19, value=5, label="{value}", on_change=on_smooth_change)
-        lbl = ft.Text("Smoothing Factor: 5")
-
-        self.content_area.controls.extend([
-            ft.Text("Settings", size=30, weight=ft.FontWeight.BOLD),
-            ft.Container(height=20),
-            lbl,
-            slider,
-            ft.Container(height=20),
-            ft.Text("One Euro Filter Active", color=ft.Colors.GREEN_400)
-        ])
+        # Dashboard Layout
+        dashboard = ft.Container(
+            content=ft.Column([
+                ft.Text("Hand Mouse OS", size=40, weight=ft.FontWeight.BOLD),
+                ft.Text("V 1.0.0 - Optimized Core", size=16, color=ft.Colors.GREY_400),
+                ft.Container(height=30),
+                
+                ft.Row([
+                    # Status Card
+                    ft.Container(
+                        content=ft.Column([
+                            ft.Icon(ft.Icons.MONITOR_HEART, size=40, color=ft.Colors.BLUE_400),
+                            ft.Text("AI Engine", size=14, weight=ft.FontWeight.BOLD),
+                            self.btn_start
+                        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                        bgcolor="#2b2d31", padding=20, border_radius=15, width=200
+                    ),
+                    
+                    # Info Card
+                    ft.Container(
+                        content=ft.Column([
+                            ft.Icon(ft.Icons.INFO_OUTLINE, size=40, color=ft.Colors.ORANGE_400),
+                            ft.Text("GPU Status", size=14, weight=ft.FontWeight.BOLD),
+                            ft.Text("CPU Fallback" if "CPU" in str(self.engine.options.base_options.delegate) else "Auto/GPU", size=12)
+                        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                        bgcolor="#2b2d31", padding=20, border_radius=15, width=200
+                    )
+                ], spacing=20),
+                
+                ft.Container(height=30),
+                ft.Text("Console Logs:", weight=ft.FontWeight.BOLD),
+                ft.Container(
+                    content=ft.Text("System initialized.\nReady to capture.", font_family="Consolas", color=ft.Colors.GREEN_400),
+                    bgcolor="#111111", padding=10, border_radius=5, width=600, height=150
+                )
+            ]),
+            padding=40
+        )
+        self.content_area.controls.append(dashboard)
 
     def toggle_engine(self, e):
         if not self.engine.is_processing:
@@ -152,7 +155,19 @@ class AppGUI:
             self.btn_start.icon = ft.Icons.PLAY_ARROW
             self.btn_start.bgcolor = ft.Colors.BLUE_400
         
-        self.btn_start.update() 
+        self.btn_start.update()
+
+    def build_layout(self):
+        self.page.add(
+            ft.Row(
+                [
+                    self.rail,
+                    ft.VerticalDivider(width=1, color=ft.Colors.GREY_800),
+                    self.content_area,
+                ],
+                expand=True,
+            )
+        )
 
 def main(page: ft.Page):
     app = AppGUI(page)

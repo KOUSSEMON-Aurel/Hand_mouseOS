@@ -179,9 +179,98 @@ class AdaptiveSensitivityMapper:
         # Scale to screen
         return int(x_final * self.screen_width), int(y_final * self.screen_height)
 
+class CalibrationSystem:
+    """Système de calibration 4-points pour mapping caméra→écran"""
+    
+    def __init__(self, screen_width: int = 1920, screen_height: int = 1080):
+        self.screen_width = screen_width
+        self.screen_height = screen_height
+        self.transform_matrix = None
+        self.is_calibrated = False
+    
+    def calibrate(self, camera_points: List[Tuple[float, float]]) -> bool:
+        """
+        Effectuer la calibration
+        Args:
+            camera_points: 4 points détectés par la caméra [top-left, top-right, bottom-right, bottom-left]
+        """
+        if len(camera_points) != 4:
+            return False
+        
+        # Points cibles à l'écran (coins)
+        screen_points = [
+            (0, 0),
+            (self.screen_width, 0),
+            (self.screen_width, self.screen_height),
+            (0, self.screen_height)
+        ]
+        
+        # Convertir en numpy
+        src_pts = np.float32(camera_points)
+        dst_pts = np.float32(screen_points)
+        
+        # Calculer transformation perspective
+        self.transform_matrix = cv2.getPerspectiveTransform(src_pts, dst_pts)
+        self.is_calibrated = True
+        
+        return True
+    
+    def apply(self, x: float, y: float) -> Tuple[float, float]:
+        """Appliquer la transformation calibrée"""
+        if not self.is_calibrated:
+            # Pas calibré → mapping simple
+            return x * self.screen_width, y * self.screen_height
+        
+        # Appliquer transformation perspective
+        point = np.array([[[x, y]]], dtype=np.float32)
+        transformed = cv2.perspectiveTransform(point, self.transform_matrix)
+        
+        return float(transformed[0][0][0]), float(transformed[0][0][1])
+    
+    def save(self, filepath: str):
+        if self.is_calibrated:
+            np.save(filepath, self.transform_matrix)
+    
+    def load(self, filepath: str) -> bool:
+        try:
+            self.transform_matrix = np.load(filepath)
+            self.is_calibrated = True
+            return True
+        except:
+            return False
+
 # ============================================================================
-# 5. DWELL CLICK
+# 5. VISUAL FEEDBACK & EXTRAS
 # ============================================================================
+
+class VisualFeedback:
+    @staticmethod
+    def draw_skeleton(frame: np.ndarray, landmarks: List[Tuple[int, int]]):
+        CONNECTIONS = frozenset([
+            (0, 1), (1, 2), (2, 3), (3, 4),
+            (0, 5), (5, 6), (6, 7), (7, 8),
+            (5, 9), (9, 10), (10, 11), (11, 12),
+            (9, 13), (13, 14), (14, 15), (15, 16),
+            (13, 17), (17, 18), (18, 19), (19, 20),
+            (0, 17)
+        ])
+        
+        # Dessiner les liens
+        for start_idx, end_idx in CONNECTIONS:
+            if start_idx < len(landmarks) and end_idx < len(landmarks):
+                pt1 = landmarks[start_idx]
+                pt2 = landmarks[end_idx]
+                cv2.line(frame, pt1, pt2, (0, 255, 0), 2)
+        
+        # Dessiner les points
+        for point in landmarks:
+            cv2.circle(frame, point, 4, (255, 0, 0), -1)
+    
+    @staticmethod
+    def draw_fps(frame: np.ndarray, fps: float):
+        text = f"FPS: {fps:.1f}"
+        cv2.putText(frame, text, (10, 30),
+                   cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
 class DwellClickDetector:
     def __init__(self, dwell_time=0.4, tolerance_px=15):

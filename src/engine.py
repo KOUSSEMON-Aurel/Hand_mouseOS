@@ -23,18 +23,38 @@ class HandEngine:
         self.lock = threading.Lock()
         self.latest_result = None
         
-        # --- NEW API SETUP ---
-        base_options = python.BaseOptions(model_asset_path='assets/hand_landmarker.task')
-        options = vision.HandLandmarkerOptions(
-            base_options=base_options,
-            running_mode=vision.RunningMode.LIVE_STREAM,
-            num_hands=1,
-            min_hand_detection_confidence=0.7,
-            min_hand_presence_confidence=0.7,
-            min_tracking_confidence=0.7,
-            result_callback=self.result_callback)
+        # --- NEW API SETUP (GPU/CPU) ---
+        base_options_gpu = python.BaseOptions(model_asset_path='assets/hand_landmarker.task', delegate=python.BaseOptions.Delegate.GPU)
+        base_options_cpu = python.BaseOptions(model_asset_path='assets/hand_landmarker.task', delegate=python.BaseOptions.Delegate.CPU)
         
-        self.options = options
+        try:
+            print("🚀 INITIALIZING AI ENGINE (Attempting GPU Acceleration)...")
+            self.options = vision.HandLandmarkerOptions(
+                base_options=base_options_gpu,
+                running_mode=vision.RunningMode.LIVE_STREAM,
+                num_hands=1,
+                min_hand_detection_confidence=0.7,
+                min_hand_presence_confidence=0.7,
+                min_tracking_confidence=0.7,
+                result_callback=self.result_callback)
+            
+            # Test initialization to trigger immediate failure if GPU missing
+            temp_landmarker = vision.HandLandmarker.create_from_options(self.options)
+            temp_landmarker.close()
+            print("✅ GPU ACCELERATION ENABLED! (High Performance Mode)")
+            
+        except Exception as e:
+            print(f"⚠️ GPU init failed ({e}). Falling back to CPU.")
+            self.options = vision.HandLandmarkerOptions(
+                base_options=base_options_cpu,
+                running_mode=vision.RunningMode.LIVE_STREAM,
+                num_hands=1,
+                min_hand_detection_confidence=0.7,
+                min_hand_presence_confidence=0.7,
+                min_tracking_confidence=0.7,
+                result_callback=self.result_callback)
+            print("✅ CPU MODE ACTIVE (Standard Performance)")
+        
         self.prev_fps_time = 0
         
         # Start persistent thread
