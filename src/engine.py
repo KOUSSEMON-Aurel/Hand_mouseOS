@@ -36,6 +36,10 @@ class HandEngine:
         self.feedback_overlay = FeedbackOverlay(position="top_left")
         self.virtual_keyboard = VirtualKeyboard(layout="azerty", mode="dwell")  # PHASE 8
         
+        # PHASE 8: Feature Flags (controlled by GUI)
+        self.keyboard_enabled = False
+        self.asl_enabled = False
+        
         self.current_mode = ContextMode.CURSOR
         self.current_action = ActionType.NONE
         self.active_hand_pos = (0, 0) # For overlay halo
@@ -202,7 +206,7 @@ class HandEngine:
                  # Add other actions mappings...
                  
                  # --- PHASE 8: KEYBOARD MODE ---
-                 if new_mode == ContextMode.KEYBOARD:
+                 if self.keyboard_enabled:  # Changed: Only process if enabled
                      # Send index tip position to keyboard
                      index_tip = primary_hand_landmarks[8]
                      index_pos_px = (int(index_tip.x * w), int(index_tip.y * h))
@@ -497,9 +501,17 @@ class HandEngine:
                     fps = self.profiler.get_fps()
                     cv2.putText(img, f"{int(fps)} FPS", (w - 80, h - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
                     
-                    # --- PHASE 8: KEYBOARD RENDERING ---
-                    if local_mode == ContextMode.KEYBOARD:
-                        img = self.virtual_keyboard.draw(img)
+                    # --- PHASE 8: KEYBOARD RENDERING (Separate Window) ---
+                    if self.keyboard_enabled:
+                        # Create keyboard canvas (separate from main video)
+                        keyboard_canvas = self.virtual_keyboard.draw(np.zeros((480, 960, 3), dtype=np.uint8))
+                        cv2.imshow("Virtual Keyboard", keyboard_canvas)
+                    else:
+                        # Close keyboard window if it exists
+                        try:
+                            cv2.destroyWindow("Virtual Keyboard")
+                        except:
+                            pass
 
                     # 4. Show Unified Native Window (Video + Skeleton side by side)
                     if not self.headless:

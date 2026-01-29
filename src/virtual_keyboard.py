@@ -16,7 +16,7 @@ class Button:
         self.size = size
         self.hovered = False
         self.dwell_time = 0
-        self.dwell_threshold = 15  # Frames (~0.5s à 30fps)
+        self.dwell_threshold = 30  # Frames (~1.0s à 30fps) - AUGMENTÉ
         
     def contains(self, point):
         """Vérifie si le point est dans le bouton"""

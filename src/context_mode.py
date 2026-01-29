@@ -73,11 +73,6 @@ class ContextModeDetector:
         near_right = x > (1 - self.WINDOW_EDGE_MARGIN)
         near_bottom = y > (1 - self.WINDOW_EDGE_MARGIN)
         
-        # Mais si main dans le tiers inférieur CENTRAL, c'est KEYBOARD pas WINDOW
-        if 0.70 <= y <= 1.0 and 0.15 <= x <= 0.85:
-            self._current_mode = ContextMode.KEYBOARD
-            return ContextMode.KEYBOARD
-        
         if near_left or near_right or near_bottom:
             self._current_mode = ContextMode.WINDOW
             return ContextMode.WINDOW

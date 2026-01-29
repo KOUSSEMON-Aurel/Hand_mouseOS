@@ -237,6 +237,20 @@ class AppGUI:
                 padding=20,
             )
         )
+        
+        # PHASE 8: Toggle Switches
+        self.switch_keyboard = ft.Switch(
+            label="🔤 Clavier Virtuel",
+            value=False,
+            on_change=lambda e: self.toggle_keyboard(e)
+        )
+        
+        self.switch_asl = ft.Switch(
+            label="🤟 Langue des Signes (ASL)",
+            value=False,
+            on_change=lambda e: self.toggle_asl(e),
+            disabled=True  # Not implemented yet
+        )
 
 
         # Dashboard Layout (Simplified - Skeleton is now in separate native window)
@@ -277,9 +291,13 @@ class AppGUI:
                             content=ft.Column([
                                 ft.Icon(ft.Icons.MONITOR_HEART, size=40, color=ft.Colors.BLUE_400),
                                 ft.Text("AI Engine", size=14, weight=ft.FontWeight.BOLD),
-                                self.btn_start
+                                self.btn_start,
+                                ft.Divider(height=10, color=ft.Colors.GREY_800),
+                                ft.Text("Fonctionnalités", size=12, weight=ft.FontWeight.BOLD, color=ft.Colors.GREY_400),
+                                self.switch_keyboard,
+                                self.switch_asl
                             ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                            bgcolor="#2b2d31", padding=20, border_radius=15, width=200
+                            bgcolor="#2b2d31", padding=20, border_radius=15, width=250
                         ),
                     ])
                 ], spacing=20, alignment=ft.MainAxisAlignment.START)
@@ -318,6 +336,16 @@ class AppGUI:
             self.btn_start.bgcolor = ft.Colors.BLUE_400
         
         self.btn_start.update()
+    
+    def toggle_keyboard(self, e):
+        """Active/Désactive le clavier virtuel."""
+        self.engine.keyboard_enabled = e.control.value
+        print(f"🔤 Clavier Virtuel: {'ACTIVÉ' if e.control.value else 'DÉSACTIVÉ'}")
+    
+    def toggle_asl(self, e):
+        """Active/Désactive la reconnaissance ASL."""
+        self.engine.asl_enabled = e.control.value
+        print(f"🤟 ASL: {'ACTIVÉ' if e.control.value else 'DÉSACTIVÉ'}")
 
     def build_layout(self):
         self.page.add(
