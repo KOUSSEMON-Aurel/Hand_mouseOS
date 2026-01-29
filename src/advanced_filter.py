@@ -2,9 +2,21 @@ import numpy as np
 import cv2
 from one_euro_filter import OneEuroFilter
 
+try:
+    import hand_mouse_core
+    RUST_AVAILABLE = True
+except ImportError:
+    RUST_AVAILABLE = False
+
 class HybridMouseFilter:
-    def __init__(self):
-        # 1. OneEuroFilter for jitter reduction in slow movements
+    def __init__(self, use_rust=True):
+        self.use_rust = use_rust and RUST_AVAILABLE
+        
+        if self.use_rust:
+            self.rust_filter = hand_mouse_core.RustHybridFilter()
+            print("🚀 Using RUST Accelerated Filter")
+        else:
+            # 1. OneEuroFilter for jitter reduction in slow movements
         # min_cutoff: Lower = smoother but more latency. 1.0 is a good balance.
         # beta: Higher = less lag during fast movement.
         self.one_euro = OneEuroFilter(t0=0, x0=0, dx0=0, min_cutoff=1.0, beta=0.007)
@@ -45,6 +57,9 @@ class HybridMouseFilter:
         return kf
     
     def process(self, raw_x, raw_y, timestamp_sec):
+        if self.use_rust:
+            return self.rust_filter.process(float(raw_x), float(raw_y), float(timestamp_sec))
+
         # Initialize if first run
         if self.last_pos is None:
             self.last_pos = (raw_x, raw_y)
