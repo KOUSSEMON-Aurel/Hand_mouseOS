@@ -2,6 +2,13 @@ import math
 from typing import List, Tuple, Dict
 from enum import Enum
 
+# Optimisation Rust si disponible
+try:
+    from rust_core import pinch_distance as rust_pinch
+    RUST_AVAILABLE = True
+except ImportError:
+    RUST_AVAILABLE = False
+
 class Gesture(Enum):
     """Les gestes universels du système simplifié."""
     POINTING = "POINTING"       # 👆 Index tendu seul
@@ -82,15 +89,17 @@ class StaticGestureClassifier:
     
     def _is_pinching(self, landmarks) -> bool:
         """Détecte si le pouce et l'index sont joints (pincement)."""
-        thumb_tip = landmarks[4]
-        index_tip = landmarks[8]
-        
-        # Distance euclidienne normalisée
-        dx = thumb_tip.x - index_tip.x
-        dy = thumb_tip.y - index_tip.y
-        dz = getattr(thumb_tip, 'z', 0) - getattr(index_tip, 'z', 0)
-        
-        distance = math.sqrt(dx*dx + dy*dy + dz*dz)
+        # Utilise Rust si disponible (5-10x plus rapide)
+        if RUST_AVAILABLE and hasattr(landmarks[0], 'x'):
+            coords = [(lm.x, lm.y, getattr(lm, 'z', 0.0)) for lm in landmarks]
+            distance = rust_pinch(coords)
+        else:
+            thumb_tip = landmarks[4]
+            index_tip = landmarks[8]
+            dx = thumb_tip.x - index_tip.x
+            dy = thumb_tip.y - index_tip.y
+            dz = getattr(thumb_tip, 'z', 0) - getattr(index_tip, 'z', 0)
+            distance = math.sqrt(dx*dx + dy*dy + dz*dz)
         
         return distance < self.PINCH_THRESHOLD
 

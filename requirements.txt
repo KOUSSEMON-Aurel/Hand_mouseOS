@@ -6,3 +6,4 @@ numpy
 screeninfo
 pynput
 Pillow
+fffffffffffffffffff
