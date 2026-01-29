@@ -416,6 +416,7 @@ class HandEngine:
                     
                     # --- NEW FEEDBACK OVERLAY ---
                     # 1. Draw Zones (Background)
+                    h, w = img.shape[:2]
                     img = self.feedback_overlay.draw_zone_indicators(img, local_mode.value)
                     
                     # 2. Draw Hand Halo
@@ -424,7 +425,7 @@ class HandEngine:
                         
                     # 3. Draw Skeleton & Debug Lines
                     if local_result and local_result.hand_landmarks:
-                        h, w, c = img.shape
+                        # h, w already defined above
                         for i, hand_landmarks in enumerate(local_result.hand_landmarks):
                             # ... (Keep connection logic if needed, or rely on overlay)
                             # Simplified drawing for debug (dots + lines)
