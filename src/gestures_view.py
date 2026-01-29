@@ -98,7 +98,7 @@ class GesturesView(ft.Column):
                 width=80,
                 height=80,
                 color=theme_color,
-                fit=ft.ImageFit.CONTAIN,
+                fit=ft.BoxFit.CONTAIN,
             )
         else:
             visual_content = ft.Icon(image_path, size=60, color=theme_color)
