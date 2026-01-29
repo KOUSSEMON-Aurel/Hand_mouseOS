@@ -119,7 +119,7 @@ class HandEngine:
                      is_right_hand = (label == "Right")
                  
                  # Assign Primary (Right) / Secondary (Left)
-                 # TODO: make configurable
+                 # ROBUSTNESS: Use Right as Primary if available, otherwise fallback later
                  if is_right_hand:
                      primary_hand_landmarks = hand_landmarks
                      primary_gesture = gesture_label
@@ -127,6 +127,16 @@ class HandEngine:
                  else:
                      secondary_hand_landmarks = hand_landmarks
                      secondary_gesture = gesture_label
+
+             # FALLBACK: If no Right Hand detected but hands exist, use the first hand as Primary
+             if not primary_hand_landmarks and result.hand_landmarks:
+                 primary_hand_landmarks = result.hand_landmarks[0]
+                 primary_gesture = temp_gestures[0]
+                 primary_hand_idx = 0
+                 # If this hand was also assigned to secondary, clear secondary to avoid confusion
+                 if secondary_hand_landmarks == primary_hand_landmarks:
+                     secondary_hand_landmarks = None
+                     secondary_gesture = "UNKNOWN"
 
              # --- SIMPLIFIED GESTURE SYSTEM LOGIC ---
              if primary_hand_landmarks:
@@ -153,8 +163,8 @@ class HandEngine:
                  )
                  self.current_action = action
                  
-                 # DEBUG: Print status every ~30 frames to avoid spam but see state
-                 if timestamp_ms % 30 == 0:
+                 # DEBUG: Print status every 1 second (approx 30 frames)
+                 if int(timestamp_ms / 33) % 30 == 0:
                       print(f"DEBUG: Geste={primary_gesture} Mode={new_mode.value} Action={action}")
 
                  # 4. Execute Action (Mouse Movement is special)
@@ -162,9 +172,13 @@ class HandEngine:
                  
                  # --- MOUSE MOVEMENT (Always active if Action is MOVE_CURSOR) ---
                  if action == ActionType.MOVE_CURSOR:
-                     # Index Tip (8) for pointing
-                     idx_tip = primary_hand_landmarks[8]
-                     raw_x, raw_y = int(idx_tip.x * w), int(idx_tip.y * h)
+                     # Adaptive Tracking Point
+                     # POINTING -> InteX Tip (8) for precision
+                     # PALM -> Index MCP (5) for stability
+                     track_idx = 8 if primary_gesture == "POINTING" else 5
+                     
+                     track_pt = primary_hand_landmarks[track_idx]
+                     raw_x, raw_y = int(track_pt.x * w), int(track_pt.y * h)
                      
                      # Update active hand pos for halo
                      self.active_hand_pos = (raw_x, raw_y)
