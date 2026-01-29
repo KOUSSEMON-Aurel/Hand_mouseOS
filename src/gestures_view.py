@@ -24,9 +24,9 @@ class GesturesView(ft.Column):
                             "PILOTAGE", 
                             "PAUME OUVERTE", 
                             "Le curseur suit votre index. Gardez la main détendue.",
-                            "M", # Role: Master
+                            "M", 
                             ft.Colors.CYAN_400,
-                            ft.Icons.FRONT_HAND
+                            "assets/gestures/palm.svg"
                         ),
                         
                         # --- CLIC ---
@@ -36,7 +36,7 @@ class GesturesView(ft.Column):
                             "Rapprochez le pouce et l'index (< 4cm).",
                             "M",
                             ft.Colors.AMBER_400,
-                            ft.Icons.TOUCH_APP
+                            "assets/gestures/pinch.svg"
                         ),
                         
                         # --- FIST (Future Scroll) ---
@@ -44,9 +44,9 @@ class GesturesView(ft.Column):
                             "SCROLL / ACTIONS", 
                             "POING FERMÉ", 
                             "Fermez la main pour activer le défilement (Secondary Hand).",
-                            "S", # Secondary
+                            "S",
                             ft.Colors.PURPLE_400,
-                            ft.Icons.LOCK
+                            "assets/gestures/fist.svg"
                         ),
                         
                         # --- PEACE ---
@@ -56,7 +56,7 @@ class GesturesView(ft.Column):
                             "Prise de screenshot ou action rapide personnalisée.",
                             "S",
                             ft.Colors.GREEN_400,
-                            ft.Icons.CELEBRATION
+                            "assets/gestures/peace.svg"
                         ),
                         
                         # --- THUMBS UP ---
@@ -66,7 +66,7 @@ class GesturesView(ft.Column):
                             "Valider une boîte de dialogue ou dire OK au système.",
                             "S",
                             ft.Colors.BLUE_400,
-                            ft.Icons.THUMB_UP
+                            "assets/gestures/thumbs_up.svg"
                         ),
 
                         # --- STOP ---
@@ -76,7 +76,7 @@ class GesturesView(ft.Column):
                             "Quitter instantanément le moteur de détection AI.",
                             "ESC",
                             ft.Colors.RED_400,
-                            ft.Icons.POWER_SETTINGS_NEW
+                            ft.Icons.POWER_SETTINGS_NEW # Fallback icon for non-hand
                         ),
 
                     ], spacing=20, run_spacing=20),
@@ -85,8 +85,24 @@ class GesturesView(ft.Column):
             )
         ]
 
-    def _build_premium_card(self, title, gesture, description, tag, theme_color, main_icon):
-        """Construction d'une carte au look 'Expressif' & Moderne."""
+    def _build_premium_card(self, title, gesture, description, tag, theme_color, image_path):
+        """Construction d'une carte au look 'Expressif' & Moderne avec mains SVG."""
+        
+        # Check if image_path is an SVG file or a Material Icon name
+        is_svg = isinstance(image_path, str) and image_path.endswith(".svg")
+        
+        visual_content = None
+        if is_svg:
+            visual_content = ft.Image(
+                src=image_path,
+                width=80,
+                height=80,
+                color=theme_color,
+                fit=ft.ImageFit.CONTAIN,
+            )
+        else:
+            visual_content = ft.Icon(image_path, size=60, color=theme_color)
+
         return ft.Container(
             col={"sm": 12, "md": 6, "lg": 4},
             bgcolor="#232529",
@@ -107,29 +123,32 @@ class GesturesView(ft.Column):
                         padding=ft.padding.symmetric(6, 12),
                         border_radius=20,
                     ),
-                    ft.Container(expand=True),
-                    ft.Icon(main_icon, color=theme_color, size=30),
+                    ft.Spacer() if hasattr(ft, "Spacer") else ft.Container(expand=True),
+                    ft.Icon(image_path if not is_svg else ft.Icons.FINGERPRINT, color=theme_color, size=20),
                 ]),
                 
-                ft.Container(height=20),
+                ft.Container(height=30),
                 
-                # Visual "Expressive" Placeholder
-                ft.Stack([
-                    # Glow effect
-                    ft.Container(
-                        width=100, height=100,
-                        bgcolor=ft.Colors.with_opacity(0.1, theme_color),
-                        border_radius=50,
-                    ),
-                    # Abstract hand shadow / SVG vibe
-                    ft.Container(
-                        width=60, height=60,
-                        content=ft.Icon(main_icon, size=40, color=ft.Colors.with_opacity(0.5, theme_color)),
-                        margin=ft.margin.only(left=20, top=20)
-                    )
-                ]),
+                # Visual Centerpiece (SVG Hand)
+                ft.Container(
+                    content=ft.Stack([
+                        # Outer Glow
+                        ft.Container(
+                            width=120, height=120,
+                            bgcolor=ft.Colors.with_opacity(0.05, theme_color),
+                            border_radius=60,
+                        ),
+                        # Central Content
+                        ft.Container(
+                            content=visual_content,
+                            alignment=ft.alignment.center,
+                            width=120, height=120,
+                        )
+                    ]),
+                    alignment=ft.alignment.center,
+                ),
                 
-                ft.Container(height=20),
+                ft.Container(height=30),
                 
                 ft.Text(title, size=14, color=theme_color, weight=ft.FontWeight.BOLD),
                 ft.Text(gesture, size=24, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
@@ -142,11 +161,13 @@ class GesturesView(ft.Column):
     def _handle_hover(self, e, color):
         if e.data == "true":
             e.control.border = ft.border.all(2, color)
-            e.control.shadow.blur_radius = 40
-            e.control.shadow.color = ft.Colors.with_opacity(0.15, color)
+            # Safe shadow update
+            if e.control.shadow:
+                e.control.shadow.blur_radius = 40
+                e.control.shadow.color = ft.Colors.with_opacity(0.15, color)
         else:
             e.control.border = ft.border.all(1, ft.Colors.with_opacity(0.1, ft.Colors.WHITE))
-            e.control.shadow.blur_radius = 20
-            e.control.shadow.color = ft.Colors.with_opacity(0.05, ft.Colors.BLACK)
+            if e.control.shadow:
+                e.control.shadow.blur_radius = 20
+                e.control.shadow.color = ft.Colors.with_opacity(0.05, ft.Colors.BLACK)
         e.control.update()
-
