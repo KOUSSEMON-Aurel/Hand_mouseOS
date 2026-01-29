@@ -12,7 +12,10 @@ import base64
 from src.mouse_driver import MouseDriver
 from src.optimized_utils import CameraConfigurator, PerformanceProfiler
 from src.advanced_filter import HybridMouseFilter # NEW
-from src.gesture_classifier import StaticGestureClassifier # NEW PHASE 4
+from src.gesture_classifier import StaticGestureClassifier # Refactored
+from src.context_mode import ContextModeDetector, ContextMode # NEW
+from src.action_dispatcher import ActionDispatcher, ActionType # NEW
+from src.feedback_overlay import FeedbackOverlay # NEW
 
 class HandEngine:
     def __init__(self, headless=False):
@@ -24,7 +27,16 @@ class HandEngine:
         
         self.mouse = MouseDriver()
         self.filter = HybridMouseFilter() # NEW: Initialize Filter
-        self.gesture_classifier = StaticGestureClassifier() # NEW PHASE 4
+        self.gesture_classifier = StaticGestureClassifier() # Refactored
+        
+        # --- NEW: Simplified Gesture System Components ---
+        self.mode_detector = ContextModeDetector()
+        self.action_dispatcher = ActionDispatcher()
+        self.feedback_overlay = FeedbackOverlay(position="top_left")
+        
+        self.current_mode = ContextMode.CURSOR
+        self.current_action = ActionType.NONE
+        self.active_hand_pos = (0, 0) # For overlay halo
         
         # --- OPTIMIZATION: Profiler ---
         self.profiler = PerformanceProfiler()
@@ -84,44 +96,94 @@ class HandEngine:
 
              # Identify Primary Hand (Right Hand Preferred for Mouse)
              temp_gestures = []
-
-             # Loop through all detected hands
+             
+             # Prepare data for simplified system
+             primary_hand_landmarks = None
+             secondary_hand_landmarks = None
+             primary_gesture = "UNKNOWN"
+             secondary_gesture = "UNKNOWN"
+             primary_hand_idx = -1
+             
+             # First Pass: Classify all hands and identify Primary/Secondary
              for i, hand_landmarks in enumerate(result.hand_landmarks):
-                 # 1. Classify Gesture
+                 # Classify Gesture
                  gesture_label = self.gesture_classifier.classify(hand_landmarks)
                  temp_gestures.append(gesture_label)
-
-                 # 2. Get Handedness Label (if available)
-                 hand_label = "Unknown"
+                 
+                 # Determine Handedness
+                 is_right_hand = True # Default
                  if result.handedness and i < len(result.handedness):
-                     hand_label = result.handedness[i][0].category_name
+                     # MediaPipe: "Left" = Right in mirror mode, but let's trust label for now
+                     # Note: Usually "Right" label means Right Hand
+                     label = result.handedness[i][0].category_name
+                     is_right_hand = (label == "Right")
                  
-                 is_primary = (i == 0) 
+                 # Assign Primary (Right) / Secondary (Left)
+                 # TODO: make configurable
+                 if is_right_hand:
+                     primary_hand_landmarks = hand_landmarks
+                     primary_gesture = gesture_label
+                     primary_hand_idx = i
+                 else:
+                     secondary_hand_landmarks = hand_landmarks
+                     secondary_gesture = gesture_label
+
+             # --- SIMPLIFIED GESTURE SYSTEM LOGIC ---
+             if primary_hand_landmarks:
+                 # 1. Get Normalized Position (Tip of Index Finger usually, or Wrist)
+                 # Using Index MCP (5) or Wrist (0) as robust anchor for mode detection
+                 wrist = primary_hand_landmarks[0]
                  
-                 h, w = 480, 640
-                 lm_list = []
-                 for lm in hand_landmarks:
-                     px, py = int(lm.x * w), int(lm.y * h)
-                     lm_list.append((px, py))
+                 # 2. Detect Context Mode
+                 # We pass secondary hand info for Shortcut mode detection
+                 secondary_wrist = secondary_hand_landmarks[0] if secondary_hand_landmarks else None
+                 sec_pos = (secondary_wrist.x, secondary_wrist.y) if secondary_wrist else None
                  
-                 if len(lm_list) > 12:
-                     distance = self._get_distance(lm_list[8], lm_list[4])
-                     ts_seconds = timestamp_ms / 1000.0
+                 new_mode = self.mode_detector.detect_mode(
+                     hand_pos=(wrist.x, wrist.y),
+                     left_hand_gesture=secondary_gesture,
+                     left_hand_pos=sec_pos
+                 )
+                 self.current_mode = new_mode
+                 
+                 # 3. Determine Action
+                 action = self.action_dispatcher.get_action(
+                     mode=new_mode.value,
+                     gesture=primary_gesture
+                 )
+                 self.current_action = action
+                 
+                 # 4. Execute Action (Mouse Movement is special)
+                 h, w = 480, 640 # Canvas size
+                 
+                 # --- MOUSE MOVEMENT (Always active if Action is MOVE_CURSOR) ---
+                 if action == ActionType.MOVE_CURSOR:
+                     # Index Tip (8) for pointing
+                     idx_tip = primary_hand_landmarks[8]
+                     raw_x, raw_y = int(idx_tip.x * w), int(idx_tip.y * h)
                      
-                     if is_primary:
-                         # --- MOUSE CONTROL (Primary Only) ---
-                         # Use Gesture for better click detection? (Future)
-                         # For now keep distance based for compatibility
-                         if distance < 40: # Click
-                             self.mouse.click()
-                         else: # Move
-                             # APPLY HYBRID FILTER
-                             raw_x, raw_y = lm_list[8]
-                             smooth_x, smooth_y = self.filter.process(raw_x, raw_y, ts_seconds)
-                             self.mouse.move(smooth_x, smooth_y, w, h, timestamp=ts_seconds)
-                     else:
-                         # SECONDARY HAND: Sign language preparation
-                         pass
+                     # Update active hand pos for halo
+                     self.active_hand_pos = (raw_x, raw_y)
+                     
+                     # Apply Hybrid Filter
+                     ts_seconds = timestamp_ms / 1000.0
+                     smooth_x, smooth_y = self.filter.process(raw_x, raw_y, ts_seconds)
+                     self.mouse.move(smooth_x, smooth_y, w, h, timestamp=ts_seconds)
+                     
+                 # --- OTHER ACTIONS ---
+                 elif action == ActionType.CLICK_LEFT:
+                     self.mouse.click()
+                 elif action == ActionType.CLICK_RIGHT:
+                     self.mouse.right_click()
+                 elif action == ActionType.SCROLL_UP:
+                     # Scroll based on vertical movement of index tip vs previous?
+                     # For now static scroll
+                     self.mouse.scroll(0, 1) # Scroll UP
+                 # Add other actions mappings...
+                 
+             else:
+                 # No primary hand detected
+                 pass
              
              with self.lock:
                  self.current_gestures = temp_gestures
@@ -338,26 +400,34 @@ class HandEngine:
                     self.profiler.mark('inference_sent')
 
                     # 3. Draw LATEST known result
-                    # FPS Calculation from Profiler
-                    fps = self.profiler.get_fps()
-                    cv2.putText(img, f"OPS: {int(fps)}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                    
-                    # STATUS HUD
-                    status_color = (0, 255, 0) if self.using_gpu else (0, 165, 255) # Green for GPU, Orange for CPU
-                    status_text = "GPU: ON" if self.using_gpu else "GPU: OFF (CPU)"
-                    cv2.putText(img, status_text, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, status_color, 2)
-
                     local_result = None
+                    local_mode = ContextMode.CURSOR
+                    local_action = ActionType.NONE
+                    local_hand_halo_pos = None
                     local_gestures = []
+                    
                     with self.lock:
                         if self.latest_result:
                              local_result = self.latest_result
                              local_gestures = self.current_gestures
+                             local_mode = self.current_mode
+                             local_action = self.current_action
+                             local_hand_halo_pos = self.active_hand_pos
                     
+                    # --- NEW FEEDBACK OVERLAY ---
+                    # 1. Draw Zones (Background)
+                    img = self.feedback_overlay.draw_zone_indicators(img, local_mode.value)
+                    
+                    # 2. Draw Hand Halo
+                    if local_hand_halo_pos and local_hand_halo_pos != (0, 0):
+                        img = self.feedback_overlay.draw_hand_halo(img, local_hand_halo_pos, local_mode.value)
+                        
+                    # 3. Draw Skeleton & Debug Lines
                     if local_result and local_result.hand_landmarks:
                         h, w, c = img.shape
                         for i, hand_landmarks in enumerate(local_result.hand_landmarks):
-                            # Hand Connections (Simplified)
+                            # ... (Keep connection logic if needed, or rely on overlay)
+                            # Simplified drawing for debug (dots + lines)
                             CONNECTIONS = frozenset([
                                 (0, 1), (1, 2), (2, 3), (3, 4),
                                 (0, 5), (5, 6), (6, 7), (7, 8),
@@ -371,26 +441,29 @@ class HandEngine:
                             for lm in hand_landmarks:
                                 px, py = int(lm.x * w), int(lm.y * h)
                                 lm_list.append((px, py))
-                                cv2.circle(img, (px, py), 3, (0, 255, 255), cv2.FILLED) 
+                                cv2.circle(img, (px, py), 2, (100, 100, 100), cv2.FILLED) 
 
                             for start_idx, end_idx in CONNECTIONS:
                                  if start_idx < len(lm_list) and end_idx < len(lm_list):
-                                     cv2.line(img, lm_list[start_idx], lm_list[end_idx], (0, 255, 0), 2)
+                                     cv2.line(img, lm_list[start_idx], lm_list[end_idx], (50, 50, 50), 1)
 
-                            # HUD for this Hand - Use handedness (L/R)
-                            gesture = local_gestures[i] if i < len(local_gestures) else "TRACKING"
-                            
-                            # Get handedness from MediaPipe (Left/Right)
-                            hand_label = "?"
-                            if local_result.handedness and i < len(local_result.handedness):
-                                handedness = local_result.handedness[i][0].category_name
-                                hand_label = "L" if handedness == "Left" else "R"
-                            
-                            color = (0, 255, 0) if hand_label == "R" else (255, 0, 255)  # Green=Right, Purple=Left
-                            
-                            root_x, root_y = lm_list[0]
-                            cv2.putText(img, f"[{hand_label}] {gesture}", (root_x - 20, root_y + 30), 
-                                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                    # 4. Draw Info Overlay (Foreground)
+                    # Find primary gesture label equivalent for display
+                    display_gesture = "UNKNOWN"
+                    if local_gestures:
+                        display_gesture = local_gestures[0] # Assuming Primary logic
+                        
+                    img = self.feedback_overlay.draw(
+                        frame=img,
+                        mode=local_mode.value,
+                        gesture=display_gesture,
+                        action=self.action_dispatcher.get_action_info(local_action)["emoji"] + " " + self.action_dispatcher.get_action_info(local_action)["name"],
+                        confidence=1.0 # Placeholder
+                    )
+                    
+                    # FPS (Small debug)
+                    fps = self.profiler.get_fps()
+                    cv2.putText(img, f"{int(fps)} FPS", (w - 80, h - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
                     # 4. Show Unified Native Window (Video + Skeleton side by side)
                     if not self.headless:
