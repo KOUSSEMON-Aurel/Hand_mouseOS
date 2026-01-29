@@ -233,10 +233,7 @@ class HandEngine:
                      is_pinching = (primary_gesture == "PINCH")
                      self.virtual_keyboard.check_input(index_pos_px, is_pinching)
                  
-                  # --- PHASE 8: ASL RECOGNITION (Geometric - No TF) ---
-                  if self.asl_enabled and primary_hand_landmarks:
-                      lbl, conf = self.sign_interpreter.predict(None, primary_hand_landmarks)
-                      self.last_asl_prediction = f"{lbl} ({conf:.2f})"
+                 self._process_asl(primary_hand_landmarks)
              else:
                  # No primary hand detected
                  pass
@@ -580,3 +577,9 @@ class HandEngine:
 
     def set_smoothing(self, value):
         self.mouse.set_smoothing(value)
+
+    def _process_asl(self, landmarks):
+        """Helper to process ASL recognition safely."""
+        if self.asl_enabled and landmarks:
+            lbl, conf = self.sign_interpreter.predict(None, landmarks)
+            self.last_asl_prediction = f"{lbl} ({conf:.2f})"
