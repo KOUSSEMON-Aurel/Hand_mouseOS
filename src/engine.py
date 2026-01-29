@@ -16,6 +16,7 @@ from src.gesture_classifier import StaticGestureClassifier # Refactored
 from src.context_mode import ContextModeDetector, ContextMode # NEW
 from src.action_dispatcher import ActionDispatcher, ActionType # NEW
 from src.feedback_overlay import FeedbackOverlay # NEW
+from src.virtual_keyboard import VirtualKeyboard # PHASE 8
 
 class HandEngine:
     def __init__(self, headless=False):
@@ -33,6 +34,7 @@ class HandEngine:
         self.mode_detector = ContextModeDetector()
         self.action_dispatcher = ActionDispatcher()
         self.feedback_overlay = FeedbackOverlay(position="top_left")
+        self.virtual_keyboard = VirtualKeyboard(layout="azerty", mode="dwell")  # PHASE 8
         
         self.current_mode = ContextMode.CURSOR
         self.current_action = ActionType.NONE
@@ -164,8 +166,8 @@ class HandEngine:
                  self.current_action = action
                  
                  # DEBUG: Print status every 1 second (approx 30 frames)
-                 if int(timestamp_ms / 33) % 30 == 0:
-                      print(f"DEBUG: Geste={primary_gesture} Mode={new_mode.value} Action={action}")
+                 # if int(timestamp_ms / 33) % 30 == 0:
+                 #      print(f"DEBUG: Geste={primary_gesture} Mode={new_mode.value} Action={action}")
 
                  # 4. Execute Action (Mouse Movement is special)
                  h, w = 480, 640 # Canvas size
@@ -198,6 +200,14 @@ class HandEngine:
                      # For now static scroll
                      self.mouse.scroll(0, 1) # Scroll UP
                  # Add other actions mappings...
+                 
+                 # --- PHASE 8: KEYBOARD MODE ---
+                 if new_mode == ContextMode.KEYBOARD:
+                     # Send index tip position to keyboard
+                     index_tip = primary_hand_landmarks[8]
+                     index_pos_px = (int(index_tip.x * w), int(index_tip.y * h))
+                     is_pinching = (primary_gesture == "PINCH")
+                     self.virtual_keyboard.check_input(index_pos_px, is_pinching)
                  
              else:
                  # No primary hand detected
@@ -347,6 +357,9 @@ class HandEngine:
                         continue
 
                     # Window creation moved to unified view display
+                    if not self.headless:
+                        # Create window with GUI_NORMAL to hide toolbar
+                        cv2.namedWindow("Hand Mouse AI - Unified View", cv2.WINDOW_GUI_NORMAL)
                     
                     # Try GPU first, fallback to CPU
                     try:
@@ -483,6 +496,10 @@ class HandEngine:
                     # FPS (Small debug)
                     fps = self.profiler.get_fps()
                     cv2.putText(img, f"{int(fps)} FPS", (w - 80, h - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                    
+                    # --- PHASE 8: KEYBOARD RENDERING ---
+                    if local_mode == ContextMode.KEYBOARD:
+                        img = self.virtual_keyboard.draw(img)
 
                     # 4. Show Unified Native Window (Video + Skeleton side by side)
                     if not self.headless:

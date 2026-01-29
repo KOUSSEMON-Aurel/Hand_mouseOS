@@ -16,6 +16,7 @@ class ContextMode(Enum):
     WINDOW = "window"      # Près des bords - gestion fenêtres
     MEDIA = "media"        # Zone haute - multimédia
     SHORTCUT = "shortcut"  # Main gauche fixe - raccourcis clavier
+    KEYBOARD = "keyboard"  # Zone basse - Clavier virtuel
 
 
 class ContextModeDetector:
@@ -71,6 +72,11 @@ class ContextModeDetector:
         near_left = x < self.WINDOW_EDGE_MARGIN
         near_right = x > (1 - self.WINDOW_EDGE_MARGIN)
         near_bottom = y > (1 - self.WINDOW_EDGE_MARGIN)
+        
+        # Mais si main dans le tiers inférieur CENTRAL, c'est KEYBOARD pas WINDOW
+        if 0.70 <= y <= 1.0 and 0.15 <= x <= 0.85:
+            self._current_mode = ContextMode.KEYBOARD
+            return ContextMode.KEYBOARD
         
         if near_left or near_right or near_bottom:
             self._current_mode = ContextMode.WINDOW
@@ -149,6 +155,12 @@ class ContextModeDetector:
                 "emoji": "⌨️",
                 "description": "Raccourcis clavier (Ctrl+...)",
                 "color": "#FFFF00"  # Jaune
+            },
+            ContextMode.KEYBOARD: {
+                "name": "Clavier",
+                "emoji": "⌨️",
+                "description": "Clavier virtuel",
+                "color": "#FFA500"  # Orange
             }
         }
         return mode_info.get(self._current_mode, mode_info[ContextMode.CURSOR])
