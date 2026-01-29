@@ -57,6 +57,11 @@ class HandEngine:
             if result.hand_landmarks:
                 # We only take the first hand for the principal 3D display for now
                 self.latest_landmarks = result.hand_landmarks[0]
+                # Capture World Landmarks for 3D visualization
+                if result.hand_world_landmarks:
+                     self.latest_world_landmarks = result.hand_world_landmarks[0]
+                else:
+                     self.latest_world_landmarks = None
                 
                 # --- STREAM TO TAURI HUD ---
                 try:
@@ -132,6 +137,75 @@ class HandEngine:
     def _get_distance(self, p1, p2):
         return math.hypot(p2[0] - p1[0], p2[1] - p1[1])
 
+    def _draw_skeleton_4view(self, result):
+        """Draws a 4-view skeleton visualization in a native OpenCV window."""
+        import numpy as np
+        
+        # Canvas 600x400 (4 quadrants: 300x200 each)
+        img = np.zeros((400, 600, 3), dtype=np.uint8)
+        
+        # Draw Quadrant Lines
+        cv2.line(img, (300, 0), (300, 400), (50, 50, 50), 2)
+        cv2.line(img, (0, 200), (600, 200), (50, 50, 50), 2)
+        
+        # Labels
+        cv2.putText(img, 'Main View', (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 255), 1)
+        cv2.putText(img, 'Top View', (310, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 255), 1)
+        cv2.putText(img, 'Left View', (10, 220), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 255), 1)
+        cv2.putText(img, 'Right View', (310, 220), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 255), 1)
+        
+        CONNECTIONS = [
+            (0, 1), (1, 2), (2, 3), (3, 4),
+            (0, 5), (5, 6), (6, 7), (7, 8),
+            (5, 9), (9, 10), (10, 11), (11, 12),
+            (9, 13), (13, 14), (14, 15), (15, 16),
+            (13, 17), (17, 18), (18, 19), (19, 20),
+            (0, 17)
+        ]
+        
+        def draw_hand(pts, offset_x, offset_y, scale, color):
+            # Draw Bones
+            for start, end in CONNECTIONS:
+                if start < len(pts) and end < len(pts):
+                    pt1 = (int(pts[start][0] * scale + offset_x), int(pts[start][1] * scale + offset_y))
+                    pt2 = (int(pts[end][0] * scale + offset_x), int(pts[end][1] * scale + offset_y))
+                    cv2.line(img, pt1, pt2, (180, 180, 180), 2)
+            # Draw Joints
+            for p in pts:
+                px = int(p[0] * scale + offset_x)
+                py = int(p[1] * scale + offset_y)
+                cv2.circle(img, (px, py), 3, color, -1)
+        
+        if result and result.hand_landmarks:
+            for i, hand_landmarks in enumerate(result.hand_landmarks):
+                color = (0, 255, 255) if i == 0 else (255, 0, 255)  # Yellow / Purple
+                
+                # 1. Main View (Top-Left) - Screen Landmarks
+                screen_pts = np.array([(lm.x * 300, lm.y * 200) for lm in hand_landmarks])
+                draw_hand(screen_pts, 0, 0, 1.0, color)
+                
+                # 2. 3D Views - World Landmarks
+                if result.hand_world_landmarks and i < len(result.hand_world_landmarks):
+                    w_lms = result.hand_world_landmarks[i]
+                    w_pts = np.array([(lm.x, lm.y, lm.z) for lm in w_lms])
+                    scale_3d = 1000
+                    
+                    # Top View (XZ plane) -> Top-Right
+                    top_pts = np.column_stack((w_pts[:, 0], -w_pts[:, 2]))
+                    draw_hand(top_pts, 450, 100, scale_3d, color)
+                    
+                    # Left View (ZY plane) -> Bottom-Left
+                    left_pts = np.column_stack((-w_pts[:, 2], w_pts[:, 1]))
+                    draw_hand(left_pts, 150, 300, scale_3d, color)
+                    
+                    # Right View (ZY plane, inverted) -> Bottom-Right
+                    right_pts = np.column_stack((w_pts[:, 2], w_pts[:, 1]))
+                    draw_hand(right_pts, 450, 300, scale_3d, color)
+        else:
+            cv2.putText(img, "WAITING...", (240, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+        
+        return img
+
     def _run_loop(self):
         print(f"DEBUG: Thread _run_loop started. Running={self.running}")
         try:
@@ -146,7 +220,7 @@ class HandEngine:
                 base_options=base_options_gpu,
                 running_mode=vision.RunningMode.LIVE_STREAM,
                 num_hands=2,
-                min_hand_detection_confidence=0.5,
+                min_hand_detection_confidence=0.3,
                 min_hand_presence_confidence=0.5,
                 min_tracking_confidence=0.5,
                 result_callback=self.result_callback)
@@ -317,15 +391,13 @@ class HandEngine:
                     # 4. Show Native Window
                     if not self.headless:
                         cv2.imshow(window_name, img)
+                        
+                        # 5. Show Skeleton 4-View Window
+                        skel_img = self._draw_skeleton_4view(local_result)
+                        cv2.imshow("Skeleton 4-View", skel_img)
                     
                     self.profiler.mark('end')
                     self.profiler.measure('total', 'start', 'end')
-                    
-                    if self.frame_callback:
-                        # Encode to Base64 for Flet Image
-                        _, buffer = cv2.imencode('.jpg', img)
-                        b64_img = base64.b64encode(buffer).decode('utf-8')
-                        self.frame_callback(b64_img)
 
                     if cv2.waitKey(1) & 0xFF == ord('q'):
                         self.stop()

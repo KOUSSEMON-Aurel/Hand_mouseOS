@@ -17,7 +17,8 @@ class AppGUI:
         self.page.padding = 0
         self.page.bgcolor = "#1a1c21"
         
-        self.engine = HandEngine()
+        # Initialize Engine (Native Window Enabled as requested)
+        self.engine = HandEngine(headless=False)
         self.wv_3d = None # WebView for 3D HUD
         
         # Start Local HUD Server
@@ -103,60 +104,112 @@ class AppGUI:
     # --- Skeleton Visualization Helpers ---
     def _create_blank_skeleton(self):
         """Generates a blank black image for idle state."""
-        from PIL import Image as PILImage, ImageDraw
-        import io, base64
-        img = PILImage.new('RGB', (300, 300), color='#111111')
-        draw = ImageDraw.Draw(img)
-        draw.text((100, 140), "Waiting...", fill='#555555')
-        buffer = io.BytesIO()
-        img.save(buffer, format='PNG')
-        return base64.b64encode(buffer.getvalue()).decode()
+        import cv2
+        import numpy as np
+        import base64
+        
+        # Create 600x400 black image (Matches Main Container)
+        img = np.zeros((400, 600, 3), dtype=np.uint8)
+        
+        # Draw grid lines for 4 quadrants (300x200 each)
+        cv2.line(img, (300, 0), (300, 400), (50, 50, 50), 2)
+        cv2.line(img, (0, 200), (600, 200), (50, 50, 50), 2)
+        
+        # Labels
+        cv2.putText(img, 'Main View', (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 255), 1)
+        cv2.putText(img, 'Top View', (310, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 255), 1)
+        cv2.putText(img, 'Left View', (10, 220), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 255), 1)
+        cv2.putText(img, 'Right View', (310, 220), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 255), 1)
+        
+        cv2.putText(img, "WAITING...", (240, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+        
+        _, buffer = cv2.imencode('.png', img)
+        return base64.b64encode(buffer).decode()
 
-    def _draw_hand_skeleton(self, landmarks, gesture="UNKNOWN", hand_idx=0):
-        """Draws a 2D skeleton from landmarks."""
-        from PIL import Image as PILImage, ImageDraw
-        import io, base64
+    def _draw_hand_skeleton(self, landmarks, world_landmarks=None, gesture="UNKNOWN", hand_idx=0):
+        """Draws a 4-view 3D skeleton using OpenCV."""
+        import cv2
+        import numpy as np
+        import base64
         
-        img = PILImage.new('RGB', (300, 300), color='#111111')
-        draw = ImageDraw.Draw(img)
+        # Canvas 600x400
+        img = np.zeros((400, 600, 3), dtype=np.uint8)
         
-        # Colors: Cyan for Primary, Purple for Secondary
-        color = (0, 255, 255) if hand_idx == 0 else (255, 0, 255)
+        # Draw Quadrant Lines
+        cv2.line(img, (300, 0), (300, 400), (100, 100, 100), 1)
+        cv2.line(img, (0, 200), (600, 200), (100, 100, 100), 1)
         
-        connections = [
-            (0, 1), (1, 2), (2, 3), (3, 4), 
-            (0, 5), (5, 6), (6, 7), (7, 8), 
-            (5, 9), (9, 10), (10, 11), (11, 12), 
-            (9, 13), (13, 14), (14, 15), (15, 16), 
-            (13, 17), (17, 18), (18, 19), (19, 20), 
-            (0, 17)
-        ]
+        # Labels
+        cv2.putText(img, 'Main', (5, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
+        cv2.putText(img, 'Top', (305, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
+        cv2.putText(img, 'Left', (5, 215), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
+        cv2.putText(img, 'Right', (305, 215), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
         
-        # Normalize and scale
-        width, height = 300, 300
-        points = []
-        for lm in landmarks:
-            # Mirror X for self-view feeling
-            px = int((1 - lm.x) * width)
-            py = int(lm.y * height)
-            points.append((px, py))
+        # Color
+        color = (0, 255, 255) if hand_idx == 0 else (255, 0, 255) # BGR
         
-        # Draw Lines
-        for start, end in connections:
-            if start < len(points) and end < len(points):
-                draw.line([points[start], points[end]], fill=color, width=2)
-        
-        # Draw Joints
-        for px, py in points:
-            draw.ellipse([px-2, py-2, px+2, py+2], fill=color)
+        def draw_lines(image, pts, offset_x=0, offset_y=0, scale=1.0):
+            # MediaPipe Joints: 0-4 (Thumb), 5-8 (Index), etc.
+            connections = [
+                (0, 1), (1, 2), (2, 3), (3, 4),
+                (0, 5), (5, 6), (6, 7), (7, 8),
+                (5, 9), (9, 10), (10, 11), (11, 12),
+                (9, 13), (13, 14), (14, 15), (15, 16),
+                (13, 17), (17, 18), (18, 19), (19, 20),
+                (0, 17)
+            ]
             
-        # Gesture Label
-        label = f"{'Main' if hand_idx == 0 else 'Sub'}: {gesture}"
-        draw.text((10, 10), label, fill=color)
+            # Draw Bones
+            for start, end in connections:
+                if start < len(pts) and end < len(pts):
+                    pt1 = (int(pts[start][0] * scale + offset_x), int(pts[start][1] * scale + offset_y))
+                    pt2 = (int(pts[end][0] * scale + offset_x), int(pts[end][1] * scale + offset_y))
+                    cv2.line(image, pt1, pt2, (200, 200, 200), 2)
+            
+            # Draw Joints
+            for p in pts:
+                px = int(p[0] * scale + offset_x)
+                py = int(p[1] * scale + offset_y)
+                cv2.circle(image, (px, py), 3, color, -1)
+
+        # 1. Main View (Top-Left) - Use Screen Landmarks
+        # Scale 0-1 to 300x200
+        screen_pts = np.array([(lm.x, lm.y) for lm in landmarks])
+        screen_pts[:, 0] = screen_pts[:, 0] * 300 # Width
+        screen_pts[:, 1] = screen_pts[:, 1] * 200 # Height
+        draw_lines(img, screen_pts, offset_x=0, offset_y=0)
         
-        buffer = io.BytesIO()
-        img.save(buffer, format='PNG')
-        return base64.b64encode(buffer.getvalue()).decode()
+        # 2. 3D Views - Require World Landmarks
+        if world_landmarks:
+            # Extract world x,y,z
+            w_pts = np.array([(lm.x, lm.y, lm.z) for lm in world_landmarks])
+            
+            # Normalize scale (heuristic)
+            scale_3d = 1000 
+            
+            # Top View (XZ plane) -> Top-Right (Start x=300)
+            # x -> x, z -> y
+            top_pts = w_pts[:, [0, 2]] 
+            top_pts[:, 1] = -top_pts[:, 1]
+            # Center roughly in 300x200 box (center is 150, 100 relative)
+            draw_lines(img, top_pts, offset_x=450, offset_y=100, scale=scale_3d) 
+            
+            # Left View (YZ plane) -> Bottom-Left (Start y=200)
+            # y -> y, z -> x
+            left_pts = w_pts[:, [2, 1]]
+            left_pts[:, 0] = -left_pts[:, 0]
+            draw_lines(img, left_pts, offset_x=150, offset_y=300, scale=scale_3d)
+
+            # Right View (ZY plane) -> Bottom-Right (Start x=300, y=200)
+            right_pts = w_pts[:, [2, 1]]
+            draw_lines(img, right_pts, offset_x=450, offset_y=300, scale=scale_3d)
+            
+        else:
+            cv2.putText(img, "No 3D Data", (420, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+
+        # Encode
+        _, buffer = cv2.imencode('.png', img)
+        return base64.b64encode(buffer).decode()
     # --------------------------------------
 
     def build_live_view(self):
@@ -185,26 +238,8 @@ class AppGUI:
             )
         )
 
-        # Live Skeletal HUD (Canvas 2D)
-        from PIL import Image as PILImage, ImageDraw
-        import io
-        
-        # Create initial blank canvas
-        self.skeleton_canvas = ft.Image(
-            src_base64=self._create_blank_skeleton(),
-            fit="contain",
-            expand=True
-        )
 
-        # Live Skeletal HUD (Canvas 2D)
-        self.skeleton_canvas = ft.Image(
-            src_base64=self._create_blank_skeleton(),
-            fit="contain",
-            expand=True,
-            gapless_playback=True 
-        )
-
-        # Dashboard Layout
+        # Dashboard Layout (Simplified - Skeleton is now in separate native window)
         dashboard = ft.Container(
             content=ft.Column([
                 ft.Row([
@@ -214,13 +249,25 @@ class AppGUI:
                 ]),
                 
                 ft.Row([
-                    # Left Side: Visualization
+                    # Left Side: Info Panel (Skeleton is in separate window)
                     ft.Container(
-                        content=self.wv_3d,
-                        bgcolor="#000000",
+                        content=ft.Column([
+                            ft.Icon(ft.Icons.FRONT_HAND, size=80, color=ft.Colors.CYAN_400),
+                            ft.Text("Visualisation Active", size=18, weight=ft.FontWeight.BOLD),
+                            ft.Text(
+                                "Les fenêtres de visualisation OpenCV\ns'ouvriront automatiquement.",
+                                text_align=ft.TextAlign.CENTER,
+                                color=ft.Colors.GREY_400
+                            ),
+                            ft.Divider(height=20, color=ft.Colors.GREY_800),
+                            ft.Text("Fenêtre 1: Hand Mouse AI (Webcam)", size=12, color=ft.Colors.GREEN_400),
+                            ft.Text("Fenêtre 2: Skeleton 4-View (3D)", size=12, color=ft.Colors.YELLOW_400),
+                        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=10),
+                        bgcolor="#1e1e2e",
                         border_radius=15,
-                        width=600,
-                        height=400,
+                        width=400,
+                        height=300,
+                        padding=30,
                         border=ft.border.all(1, "#45a29e")
                     ),
                     
@@ -234,16 +281,6 @@ class AppGUI:
                             ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                             bgcolor="#2b2d31", padding=20, border_radius=15, width=200
                         ),
-                        
-                        # SKELETON VIEW CONTAINER (Replacing Logs)
-                        ft.Container(
-                            content=self.skeleton_canvas,
-                            bgcolor="#111111", 
-                            border_radius=10, 
-                            width=200, 
-                            height=220,
-                            border=ft.border.all(1, "#333333")
-                        )
                     ])
                 ], spacing=20, alignment=ft.MainAxisAlignment.START)
             ]),
@@ -253,42 +290,7 @@ class AppGUI:
 
         # Start loops
         threading.Thread(target=self.update_metrics_loop, daemon=True).start()
-        threading.Thread(target=self.update_3d_loop, daemon=True).start()
-
-    def update_3d_loop(self):
-        # Callback for engine to push frames
-        def on_frame(b64_frame):
-            if self.content_area.page:
-                # 1. Update Main Video
-                if self.wv_3d:
-                    self.wv_3d.src_base64 = b64_frame
-                    self.wv_3d.update()
-                
-                # 2. Update Skeleton View
-                if self.skeleton_canvas and self.engine.latest_landmarks:
-                    # Get gestures for label
-                    gestures = getattr(self.engine, 'current_gestures', ["UNKNOWN"])
-                    g_label = gestures[0] if gestures else "TRACKING"
-                    
-                    skel_b64 = self._draw_hand_skeleton(
-                        self.engine.latest_landmarks, 
-                        gesture=g_label
-                    )
-                    self.skeleton_canvas.src_base64 = skel_b64
-                    self.skeleton_canvas.update()
-                elif self.skeleton_canvas:
-                    # Show blank if lost tracking
-                    self.skeleton_canvas.src_base64 = self._create_blank_skeleton()
-                    self.skeleton_canvas.update()
-
-        # Attach callback
-        if self.engine:
-            self.engine.frame_callback = on_frame
-            
-        # Keep thread alive monitoring engine state
-        while True:
-            # Watchdog...
-            time.sleep(1)
+        # NOTE: Skeleton update loop removed - now handled by engine in native window
 
     def update_metrics_loop(self):
         while True:
