@@ -253,9 +253,9 @@ class AppGUI:
                 ft.dropdown.Option("dwell", "SURVOL (Attendre 1s)"),
                 ft.dropdown.Option("pinch", "PINCER (Pouce+Index)")
             ],
-            width=200,
-            on_change=lambda e: self.change_keyboard_mode(e)
+            width=200
         )
+        self.keyboard_mode_dropdown.on_change = lambda e: self.change_keyboard_mode(e)
         
         self.switch_asl = ft.Switch(
             label="🤟 Langue des Signes (ASL)",
