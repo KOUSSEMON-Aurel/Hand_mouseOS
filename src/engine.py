@@ -188,17 +188,17 @@ class HandEngine:
                 if result.hand_world_landmarks and i < len(result.hand_world_landmarks):
                     w_lms = result.hand_world_landmarks[i]
                     w_pts = np.array([(lm.x, lm.y, lm.z) for lm in w_lms])
-                    scale_3d = 1000
+                    scale_3d = 600  # Reduced for better fit in quadrants
                     
-                    # Top View (XZ plane) -> Top-Right
+                    # Top View (XZ plane) -> Top-Right quadrant (center: 450, 100)
                     top_pts = np.column_stack((w_pts[:, 0], -w_pts[:, 2]))
                     draw_hand(top_pts, 450, 100, scale_3d, color)
                     
-                    # Left View (ZY plane) -> Bottom-Left
+                    # Left View (ZY plane) -> Bottom-Left quadrant (center: 150, 300)
                     left_pts = np.column_stack((-w_pts[:, 2], w_pts[:, 1]))
                     draw_hand(left_pts, 150, 300, scale_3d, color)
                     
-                    # Right View (ZY plane, inverted) -> Bottom-Right
+                    # Right View (ZY plane, inverted) -> Bottom-Right quadrant (center: 450, 300)
                     right_pts = np.column_stack((w_pts[:, 2], w_pts[:, 1]))
                     draw_hand(right_pts, 450, 300, scale_3d, color)
         else:
@@ -266,9 +266,7 @@ class HandEngine:
                         time.sleep(2)
                         continue
 
-                    if not self.headless:
-                        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-                        cv2.resizeWindow(window_name, 640, 480)
+                    # Window creation moved to unified view display
                     
                     # Try GPU first, fallback to CPU
                     try:
@@ -388,13 +386,18 @@ class HandEngine:
                             cv2.putText(img, f"[{hand_label}] {gesture}", (root_x - 20, root_y + 30), 
                                          cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
-                    # 4. Show Native Window
+                    # 4. Show Unified Native Window (Video + Skeleton side by side)
                     if not self.headless:
-                        cv2.imshow(window_name, img)
+                        import numpy as np
+                        # Resize video to match skeleton height (400px)
+                        video_resized = cv2.resize(img, (533, 400))  # 4:3 aspect ratio -> 533x400
                         
-                        # 5. Show Skeleton 4-View Window
+                        # Generate skeleton view
                         skel_img = self._draw_skeleton_4view(local_result)
-                        cv2.imshow("Skeleton 4-View", skel_img)
+                        
+                        # Combine horizontally: [Video 533x400] + [Skeleton 600x400] = 1133x400
+                        combined = np.hstack([video_resized, skel_img])
+                        cv2.imshow("Hand Mouse AI - Unified View", combined)
                     
                     self.profiler.mark('end')
                     self.profiler.measure('total', 'start', 'end')
