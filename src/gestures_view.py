@@ -141,11 +141,11 @@ class GesturesView(ft.Column):
                         # Central Content
                         ft.Container(
                             content=visual_content,
-                            alignment=ft.alignment.center,
+                            alignment=ft.alignment.Alignment(0, 0),
                             width=120, height=120,
                         )
                     ]),
-                    alignment=ft.alignment.center,
+                    alignment=ft.alignment.Alignment(0, 0),
                 ),
                 
                 ft.Container(height=30),
