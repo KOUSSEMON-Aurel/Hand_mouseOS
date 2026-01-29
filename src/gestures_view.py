@@ -120,7 +120,6 @@ class GesturesView(ft.Column):
                         width=100, height=100,
                         bgcolor=ft.Colors.with_opacity(0.1, theme_color),
                         border_radius=50,
-                        blur=ft.Blur(20, 20),
                     ),
                     # Abstract hand shadow / SVG vibe
                     ft.Container(
@@ -132,10 +131,10 @@ class GesturesView(ft.Column):
                 
                 ft.Container(height=20),
                 
-                ft.Text(title, size=14, color=theme_color, weight=ft.FontWeight.BOLD, letter_spacing=1.2),
+                ft.Text(title, size=14, color=theme_color, weight=ft.FontWeight.BOLD),
                 ft.Text(gesture, size=24, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
                 ft.Container(height=10),
-                ft.Text(description, size=14, color=ft.Colors.GREY_400, line_height=1.5),
+                ft.Text(description, size=14, color=ft.Colors.GREY_400),
                 
             ], spacing=0)
         )
