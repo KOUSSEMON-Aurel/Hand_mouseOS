@@ -153,6 +153,10 @@ class HandEngine:
                  )
                  self.current_action = action
                  
+                 # DEBUG: Print status every ~30 frames to avoid spam but see state
+                 if timestamp_ms % 30 == 0:
+                      print(f"DEBUG: Geste={primary_gesture} Mode={new_mode.value} Action={action}")
+
                  # 4. Execute Action (Mouse Movement is special)
                  h, w = 480, 640 # Canvas size
                  
