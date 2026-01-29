@@ -55,17 +55,17 @@ class SkeletonAssets:
         # Pinky (17-20)
         set_finger(17, 0.65, 0.58, 0.25, 25)
 
-        if gesture_name == "PAUME OUVERTE":
-            # Already set as default
+        if gesture_name == "PAUME OUVERTE" or gesture_name == "PALM":
+            # Already set as default (open palm)
             pass
             
-        elif gesture_name == "PINCEMENT":
+        elif gesture_name == "PINCEMENT" or gesture_name == "PINCH":
             # Index curves to meet thumb
             set_finger(5, 0.35, 0.55, 0.35, -10, curl=150) # Curled index
             # Thumb moves to meet index
             set_finger(1, 0.3, 0.7, 0.3, -20, curl=30)
             
-        elif gesture_name == "POING FERMÉ":
+        elif gesture_name == "POING FERMÉ" or gesture_name == "FIST":
             # All fingers curled
             set_finger(5, 0.35, 0.55, 0.35, -10, curl=170)
             set_finger(9, 0.45, 0.5, 0.38, 0, curl=170)
@@ -74,7 +74,7 @@ class SkeletonAssets:
             # Thumb tucked
             set_finger(1, 0.3, 0.7, 0.3, -45, curl=90)
 
-        elif gesture_name == "VICTOIRE / V":
+        elif gesture_name == "VICTOIRE / V" or gesture_name == "TWO_FINGERS":
             # Index and Middle straight, others curled
             set_finger(5, 0.35, 0.55, 0.35, -15) # Spread out
             set_finger(9, 0.45, 0.5, 0.38, 15)   # Spread out
@@ -83,12 +83,12 @@ class SkeletonAssets:
             set_finger(17, 0.65, 0.58, 0.25, 25, curl=170)
             set_finger(1, 0.3, 0.7, 0.3, -45, curl=90)
             
-        elif gesture_name == "POUCE LEVÉ":
-            # Thumb up, others curled
-            # Thumb straight up
-            set_finger(1, 0.2, 0.6, 0.35, 0, curl=-20) 
+        elif gesture_name == "POUCE LEVÉ" or gesture_name == "POINTING":
+            # For POINTING: Only index extended, others curled (including thumb)
+            # Index straight up
+            set_finger(5, 0.45, 0.55, 0.4, 0)  # Index straight up
             # Curl others
-            set_finger(5, 0.35, 0.55, 0.35, -10, curl=170)
+            set_finger(1, 0.3, 0.7, 0.3, -45, curl=90)  # Thumb curled
             set_finger(9, 0.45, 0.5, 0.38, 0, curl=170)
             set_finger(13, 0.55, 0.52, 0.35, 10, curl=170)
             set_finger(17, 0.65, 0.58, 0.25, 25, curl=170)

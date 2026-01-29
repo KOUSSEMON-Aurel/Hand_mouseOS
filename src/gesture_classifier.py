@@ -1,77 +1,124 @@
 import math
 from typing import List, Tuple, Dict
+from enum import Enum
+
+class Gesture(Enum):
+    """Les 5 gestes universels du système simplifié."""
+    POINTING = "POINTING"       # 👆 Index tendu seul
+    PINCH = "PINCH"            # 👌 Pouce + Index joints
+    PALM = "PALM"              # ✋ Main ouverte
+    FIST = "FIST"              # ✊ Poing fermé
+    TWO_FINGERS = "TWO_FINGERS" # ✌️ Index + Majeur tendus
+    UNKNOWN = "UNKNOWN"        # Pose non reconnue
+
 
 class StaticGestureClassifier:
-    """Classificateur de gestes statiques basé sur la géométrie des repères (landmarks)."""
+    """Classificateur de gestes statiques basé sur la géométrie des repères (landmarks).
+    
+    Système simplifié : 5 gestes universels uniquement.
+    """
+    
+    # Seuils de détection
+    PINCH_THRESHOLD = 0.05  # Distance normalisée pouce-index pour PINCH
     
     def __init__(self):
-        # Noms des doigts pour la lisibilité
-        self.finger_tips = [4, 8, 12, 16, 20]
-        self.finger_pips = [2, 6, 10, 14, 18] # On utilise le joint 2/3 pour la flexion
+        # Indices des landmarks
+        self.finger_tips = [4, 8, 12, 16, 20]  # Pouce, Index, Majeur, Annulaire, Auriculaire
+        self.finger_pips = [2, 6, 10, 14, 18]  # Articulations intermédiaires
         
     def classify(self, landmarks: List) -> str:
         """
         Classifie la pose de la main.
+        
         Args:
             landmarks: Liste des 21 points de la main (normalisés ou non)
+            
         Returns:
-            label (str): 'FIST', 'PALM', 'PEACE', 'THUMBS_UP', 'POINTING', 'UNKNOWN'
+            label (str): 'POINTING', 'PINCH', 'PALM', 'FIST', 'TWO_FINGERS', 'UNKNOWN'
         """
         if not landmarks or len(landmarks) < 21:
-            return "UNKNOWN"
+            return Gesture.UNKNOWN.value
+        
+        # 1. PINCH (priorité haute - détection fine)
+        if self._is_pinching(landmarks):
+            return Gesture.PINCH.value
             
         fingers_extended = self._get_extended_fingers(landmarks)
+        # fingers_extended: [Pouce, Index, Majeur, Annulaire, Auriculaire]
         
-        # Logique de décision
-        # 0: Thumb, 1: Index, 2: Middle, 3: Ring, 4: Pinky
-        
-        # 1. PALM (Tous étendus)
+        # 2. PALM (Tous les doigts étendus)
         if all(fingers_extended):
-            return "PALM"
+            return Gesture.PALM.value
             
-        # 2. FIST (Aucun étendu - sauf peut-être le pouce)
-        if not any(fingers_extended[1:]): # On ignore le pouce pour le poing pur
-             if not fingers_extended[0]:
-                 return "FIST"
-             else:
-                 return "THUMBS_UP"
-                 
-        # 3. POINTING (Seul l'index est étendu)
+        # 3. FIST (Aucun doigt étendu sauf peut-être pouce replié)
+        if not any(fingers_extended[1:]):  # Ignore le pouce
+            return Gesture.FIST.value
+        
+        # 4. POINTING (Seul l'index étendu)
         if fingers_extended[1] and not any(fingers_extended[2:]):
-            return "POINTING"
+            return Gesture.POINTING.value
             
-        # 4. PEACE (Index et Majeur étendus)
+        # 5. TWO_FINGERS (Index + Majeur étendus, autres repliés)
         if fingers_extended[1] and fingers_extended[2] and not any(fingers_extended[3:]):
-            return "PEACE"
+            return Gesture.TWO_FINGERS.value
             
-        return "UNKNOWN"
+        return Gesture.UNKNOWN.value
+    
+    def _is_pinching(self, landmarks) -> bool:
+        """Détecte si le pouce et l'index sont joints (pincement)."""
+        thumb_tip = landmarks[4]
+        index_tip = landmarks[8]
+        
+        # Distance euclidienne normalisée
+        dx = thumb_tip.x - index_tip.x
+        dy = thumb_tip.y - index_tip.y
+        dz = getattr(thumb_tip, 'z', 0) - getattr(index_tip, 'z', 0)
+        
+        distance = math.sqrt(dx*dx + dy*dy + dz*dz)
+        
+        return distance < self.PINCH_THRESHOLD
 
     def _get_extended_fingers(self, landmarks) -> List[bool]:
-        """Détermine si chaque doigt est tendu."""
+        """Détermine si chaque doigt est tendu.
+        
+        Returns:
+            Liste de 5 booléens [Pouce, Index, Majeur, Annulaire, Auriculaire]
+        """
         extended = []
         
-        # 1. POUCE (Cas particulier - mouvement horizontal)
-        # On compare le tip au mcp sur l'axe X (plus fiable pour le pouce)
-        # Note: Dépend du côté de la main, mais globalement si tip est loin du centre...
+        # 1. POUCE (Cas particulier - mouvement latéral)
+        # Compare le tip au MCP sur l'axe X
         thumb_tip = landmarks[4]
         thumb_ipp = landmarks[3]
-        thumb_mcp = landmarks[2]
         
-        # Distance pseudo-horizontale
+        # Le pouce est étendu si le tip est plus éloigné du centre de la paume
         if abs(thumb_tip.x - landmarks[5].x) > abs(thumb_ipp.x - landmarks[5].x):
             extended.append(True)
         else:
             extended.append(False)
             
-        # 2. AUTRES DOIGTS (Verticalité)
-        # Si le Tip est plus haut (Y plus petit) que le PIP
-        for i in range(1, 5): # Index à Auriculaire
+        # 2. AUTRES DOIGTS (Index à Auriculaire)
+        # Un doigt est tendu si son tip est plus haut que son PIP
+        for i in range(1, 5):
             tip = landmarks[self.finger_tips[i]]
             pip = landmarks[self.finger_pips[i]]
             
-            if tip.y < pip.y: # En vision ordi, Y descend vers le bas
+            # En coordonnées écran, Y diminue vers le haut
+            if tip.y < pip.y:
                 extended.append(True)
             else:
                 extended.append(False)
                 
         return extended
+    
+    def get_gesture_emoji(self, gesture: str) -> str:
+        """Retourne l'emoji correspondant au geste."""
+        emojis = {
+            Gesture.POINTING.value: "👆",
+            Gesture.PINCH.value: "👌",
+            Gesture.PALM.value: "✋",
+            Gesture.FIST.value: "✊",
+            Gesture.TWO_FINGERS.value: "✌️",
+            Gesture.UNKNOWN.value: "❓"
+        }
+        return emojis.get(gesture, "❓")
