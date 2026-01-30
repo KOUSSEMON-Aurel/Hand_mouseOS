@@ -2,14 +2,6 @@
  * Module de gestion des événements clavier
  */
 
-interface KeyEvent {
-    key: string;
-    code: string;
-    shiftKey: boolean;
-    ctrlKey: boolean;
-    altKey: boolean;
-}
-
 class KeyboardManager {
     private shortcuts: Map<string, () => void> = new Map();
 
@@ -26,10 +18,10 @@ class KeyboardManager {
     }
 
     private attachListeners() {
-        document.addEventListener('keydown', (e) => this.handleKeyDown(e as unknown as KeyEvent));
+        document.addEventListener('keydown', (e) => this.handleKeyDown(e));
     }
 
-    private handleKeyDown(event: KeyEvent) {
+    private handleKeyDown(event: KeyboardEvent) {
         const combo = this.getKeyCombo(event);
         const handler = this.shortcuts.get(combo);
         if (handler) {
@@ -38,7 +30,7 @@ class KeyboardManager {
         }
     }
 
-    private getKeyCombo(event: KeyEvent): string {
+    private getKeyCombo(event: KeyboardEvent): string {
         const parts: string[] = [];
         if (event.ctrlKey) parts.push('Ctrl');
         if (event.shiftKey) parts.push('Shift');
