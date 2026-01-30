@@ -32,6 +32,17 @@ class SettingsView(ft.Column):
                     self.slider,
                     
                     ft.Container(height=40),
+                    ft.Text("Matériel / Webcam", size=16, weight=ft.FontWeight.BOLD),
+                    ft.Text("Utilisez votre téléphone comme une webcam haute qualité.", size=12, color=ft.Colors.GREY_500),
+                    ft.ElevatedButton(
+                        "Installer DroidCam (Téléphone)",
+                        icon=ft.Icons.PHONE_ANDROID,
+                        color=ft.Colors.WHITE,
+                        bgcolor=ft.Colors.BLUE_600,
+                        on_click=lambda _: self.main_app.run_setup_webcam()
+                    ),
+                    
+                    ft.Container(height=40),
                     ft.Text("Diagnostic", size=16, weight=ft.FontWeight.BOLD),
                     ft.Container(
                         content=ft.Column([
