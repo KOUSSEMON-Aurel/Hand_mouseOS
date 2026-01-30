@@ -4,12 +4,15 @@ import math
 import os
 from src.optimized_utils import AdaptiveOneEuroFilter, AdaptiveSensitivityMapper
 
-# Try to import uinput (Linux only)
+# Try to import evdev (Linux only) for uinput support
+UINPUT_ERROR = None
 try:
-    import uinput
+    import evdev
+    from evdev import UInput, ecodes as E
     UINPUT_AVAILABLE = True
-except (ImportError, OSError):
+except Exception as err:
     UINPUT_AVAILABLE = False
+    UINPUT_ERROR = str(err)
 
 try:
     from pynput.mouse import Controller, Button
@@ -42,20 +45,24 @@ class MouseDriver:
         # Check for Linux & UInput support
         if self.os_name == "Linux" and UINPUT_AVAILABLE:
             try:
-                events = (
-                    uinput.BTN_LEFT,
-                    uinput.BTN_RIGHT,
-                    uinput.ABS_X + (0, self.sw, 0, 0),
-                    uinput.ABS_Y + (0, self.sh, 0, 0),
-                    uinput.REL_WHEEL, # Scrolling support
-                )
-                self.device = uinput.Device(events, name="Hand Mouse Output")
+                # Configuration du device virtuel avec evdev
+                cap = {
+                    E.EV_KEY: [E.BTN_LEFT, E.BTN_RIGHT],
+                    E.EV_ABS: [
+                        (E.ABS_X, evdev.AbsInfo(value=0, min=0, max=self.sw, fuzz=0, flat=0, resolution=0)),
+                        (E.ABS_Y, evdev.AbsInfo(value=0, min=0, max=self.sh, fuzz=0, flat=0, resolution=0)),
+                    ],
+                    E.EV_REL: [E.REL_WHEEL]
+                }
+                self.device = UInput(cap, name="Hand Mouse Output")
                 self.mode = "uinput"
-                print("MouseDriver: Using UINPUT (Kernel Level) - Maximum Performance")
-            except Exception as e:
-                print(f"MouseDriver: UInput failed ({e}). Falling back to other methods.")
+                print("MouseDriver: Using EVDEV-UINPUT (Kernel Level) - Maximum Performance")
+            except Exception as err:
+                print(f"MouseDriver: UInput failed ({err}). (/dev/uinput missing or perms?)")
                 self.mode = "fallback"
         else:
+            reason = UINPUT_ERROR if UINPUT_ERROR else "Module not loaded or OS not Linux"
+            print(f"MouseDriver: UInput not available ({reason}).")
             self.mode = "fallback"
 
         if self.mode == "fallback":
@@ -122,8 +129,9 @@ class MouseDriver:
         
         # 5. Apply Movement
         if self.mode == "uinput" and hasattr(self, 'device'):
-            self.device.emit(uinput.ABS_X, screen_x, syn=False)
-            self.device.emit(uinput.ABS_Y, screen_y)
+            self.device.write(E.EV_ABS, E.ABS_X, screen_x)
+            self.device.write(E.EV_ABS, E.ABS_Y, screen_y)
+            self.device.syn()
         elif self.mode == "pynput" and hasattr(self, 'pynput_mouse'):
             self.pynput_mouse.position = (screen_x, screen_y)
         elif self.mode == "pyautogui":
@@ -137,8 +145,10 @@ class MouseDriver:
     def click(self):
         self.frozen_until = time.time() + 0.2
         if self.mode == "uinput" and hasattr(self, 'device'):
-            self.device.emit(uinput.BTN_LEFT, 1)
-            self.device.emit(uinput.BTN_LEFT, 0)
+            self.device.write(E.EV_KEY, E.BTN_LEFT, 1)
+            self.device.syn()
+            self.device.write(E.EV_KEY, E.BTN_LEFT, 0)
+            self.device.syn()
         elif self.mode == "pynput" and hasattr(self, 'pynput_mouse'):
             self.pynput_mouse.click(Button.left)
         elif self.mode == "pyautogui":
@@ -148,8 +158,10 @@ class MouseDriver:
     def right_click(self):
         self.frozen_until = time.time() + 0.2
         if self.mode == "uinput" and hasattr(self, 'device'):
-            self.device.emit(uinput.BTN_RIGHT, 1)
-            self.device.emit(uinput.BTN_RIGHT, 0)
+            self.device.write(E.EV_KEY, E.BTN_RIGHT, 1)
+            self.device.syn()
+            self.device.write(E.EV_KEY, E.BTN_RIGHT, 0)
+            self.device.syn()
         elif self.mode == "pynput" and hasattr(self, 'pynput_mouse'):
             self.pynput_mouse.click(Button.right)
         elif self.mode == "pyautogui":
@@ -158,7 +170,9 @@ class MouseDriver:
             
     def scroll(self, dx, dy):
         if self.mode == "uinput" and hasattr(self, 'device'):
-            self.device.emit(uinput.REL_WHEEL, int(dy * 5))
+            # evdev REL_WHEEL: +1 is UP, -1 is DOWN
+            self.device.write(E.EV_REL, E.REL_WHEEL, int(dy * 5))
+            self.device.syn()
         elif self.mode == "pyautogui":
             pg = self._get_pyautogui()
             if pg: pg.scroll(int(dy * 50))

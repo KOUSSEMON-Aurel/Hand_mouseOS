@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -15,6 +16,9 @@ var startCmd = &cobra.Command{
 	Long:  `Lance l'engine de tracking et l'interface graphique.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		gui, _ := cmd.Flags().GetBool("gui")
+
+		// 0. Vérification et configuration automatique des permissions (Linux uniquement)
+		checkAndSetupUinput()
 
 		// Trouver le binaire de l'engine (portable) ou le script (dev)
 		exePath, err := os.Executable()
@@ -94,4 +98,58 @@ func findProjectRoot() (string, error) {
 	}
 
 	return "", fmt.Errorf("impossible de trouver le répertoire racine du projet")
+}
+
+// checkAndSetupUinput vérifie si uinput est accessible et propose/exécute le setup si nécessaire
+func checkAndSetupUinput() {
+	if os.Getenv("GOOS") == "windows" {
+		return
+	}
+
+	// Vérifier si /dev/uinput existe et est accessible en écriture
+	f, err := os.OpenFile("/dev/uinput", os.O_WRONLY, 0660)
+	if err == nil {
+		f.Close()
+		return // Tout est OK
+	}
+
+	fmt.Println("⚠️  Permissions /dev/uinput manquantes ou module non chargé.")
+	fmt.Println("🛠️  Tentative de configuration automatique...")
+
+	// Lancer la logique de setup permissions directement
+	// On simule l'appel à setupPermissionsCmd.Run
+	udevRule := `KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"`
+	rulePath := "/etc/udev/rules.d/99-uinput.rules"
+
+	// Demander sudo pour les opérations critiques
+	fmt.Println("  - Chargement du module uinput et configuration udev (SUDO requis)...")
+
+	setupCmds := []string{
+		"sudo modprobe uinput",
+		fmt.Sprintf("echo '%s' | sudo tee %s", udevRule, rulePath),
+		"sudo udevadm control --reload-rules",
+		"sudo udevadm trigger",
+		"sudo chmod 666 /dev/uinput",
+	}
+
+	for _, c := range setupCmds {
+		if err := exec.Command("bash", "-c", c).Run(); err != nil {
+			fmt.Printf("❌ Échec de la commande [%s]: %v\n", c, err)
+		}
+	}
+
+	// Vérifier si l'utilisateur est dans le groupe input
+	user := os.Getenv("USER")
+	groups, _ := exec.Command("groups", user).Output()
+	if !contains(string(groups), "input") {
+		fmt.Printf("  - Ajout de l'utilisateur %s au groupe 'input'...\n", user)
+		exec.Command("sudo", "usermod", "-aG", "input", user).Run()
+		fmt.Println("⚠️  NOTE : Vous devrez peut-être redémarrer votre session pour que les changements de groupe soient définitifs.")
+	}
+
+	fmt.Println("✅ Configuration automatique terminée.")
+}
+
+func contains(s, substr string) bool {
+	return strings.Contains(s, substr)
 }
