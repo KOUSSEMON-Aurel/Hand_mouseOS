@@ -13,6 +13,14 @@ except ImportError:
 except OSError:
     UINPUT_AVAILABLE = False # Permission denied case
 
+try:
+    from pynput.mouse import Controller, Button
+    PYNPUT_AVAILABLE = True
+except ImportError:
+    PYNPUT_AVAILABLE = False
+
+import os
+
 class MouseDriver:
     def __init__(self, smoothing_enabled=True):
         self.os_name = platform.system()
@@ -44,10 +52,28 @@ class MouseDriver:
                 self.mode = "uinput"
                 print("MouseDriver: Using UINPUT (Kernel Level) - Maximum Performance")
             except Exception as e:
-                print(f"MouseDriver: UInput failed ({e}). Falling back to PyAutoGUI.")
-                self.mode = "pyautogui"
+                print(f"MouseDriver: UInput failed ({e}). Falling back to other methods.")
+                self.mode = "fallback"
         else:
-             print("MouseDriver: Using PyAutoGUI")
+            self.mode = "fallback"
+
+        if self.mode == "fallback":
+            if PYNPUT_AVAILABLE:
+                try:
+                    self.pynput_mouse = Controller()
+                    self.mode = "pynput"
+                    print("MouseDriver: Using Pynput")
+                except Exception as e:
+                    print(f"MouseDriver: Pynput failed ({e}). Using PyAutoGUI.")
+                    self.mode = "pyautogui"
+            else:
+                self.mode = "pyautogui"
+                print("MouseDriver: Using PyAutoGUI")
+
+        # Session check for Wayland
+        if os.environ.get('XDG_SESSION_TYPE') == 'wayland' and self.mode != "uinput":
+            print("⚠️ WARNING: Wayland detected! PyAutoGUI/Pynput might move the cursor 'invisibly'.")
+            print("💡 TIP: Use 'uinput' for better Wayland support (requires /dev/uinput permissions).")
 
     def move(self, x, y, frame_w, frame_h, timestamp=None):
         if timestamp is None:
@@ -81,8 +107,10 @@ class MouseDriver:
         if self.mode == "uinput" and hasattr(self, 'device'):
             self.device.emit(uinput.ABS_X, screen_x, syn=False)
             self.device.emit(uinput.ABS_Y, screen_y)
+        elif self.mode == "pynput" and hasattr(self, 'pynput_mouse'):
+            self.pynput_mouse.move(screen_x - self.pynput_mouse.position[0], screen_y - self.pynput_mouse.position[1])
         else:
-            print(f"DEBUG: Move -> {screen_x}, {screen_y}")
+            # print(f"DEBUG: Move -> {screen_x}, {screen_y}")
             try:
                 pyautogui.moveTo(screen_x, screen_y)
             except Exception as e:
@@ -95,6 +123,8 @@ class MouseDriver:
         if self.mode == "uinput" and hasattr(self, 'device'):
             self.device.emit(uinput.BTN_LEFT, 1)
             self.device.emit(uinput.BTN_LEFT, 0)
+        elif self.mode == "pynput" and hasattr(self, 'pynput_mouse'):
+            self.pynput_mouse.click(Button.left)
         else:
             pyautogui.click()
             
@@ -105,6 +135,8 @@ class MouseDriver:
         if self.mode == "uinput" and hasattr(self, 'device'):
             self.device.emit(uinput.BTN_RIGHT, 1)
             self.device.emit(uinput.BTN_RIGHT, 0)
+        elif self.mode == "pynput" and hasattr(self, 'pynput_mouse'):
+            self.pynput_mouse.click(Button.right)
         else:
             pyautogui.rightClick()
             
