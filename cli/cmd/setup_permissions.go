@@ -20,9 +20,13 @@ pour permettre à Hand Mouse OS de contrôler le curseur (via uinput) sans accè
 			return
 		}
 
-		fmt.Println("🛠️ Configuration des permissions uinput...")
+		// 1. Charger le module uinput
+		fmt.Println("  - Chargement du module noyau 'uinput'...")
+		if err := exec.Command("sudo", "modprobe", "uinput").Run(); err != nil {
+			fmt.Printf("⚠️  Note: Échec du chargement de modprobe uinput (peut déjà être chargé): %v\n", err)
+		}
 
-		// 1. Créer la règle udev
+		// 2. Créer la règle udev
 		udevRule := `KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"`
 		rulePath := "/etc/udev/rules.d/99-uinput.rules"
 
@@ -33,7 +37,12 @@ pour permettre à Hand Mouse OS de contrôler le curseur (via uinput) sans accè
 			return
 		}
 
-		// 2. Ajouter l'utilisateur au groupe input
+		// 3. Recharger udev
+		fmt.Println("  - Rechargement des règles udev...")
+		exec.Command("sudo", "udevadm", "control", "--reload-rules").Run()
+		exec.Command("sudo", "udevadm", "trigger").Run()
+
+		// 4. Ajouter l'utilisateur au groupe input
 		user := os.Getenv("USER")
 		if user == "" {
 			userOutput, _ := exec.Command("whoami").Output()
