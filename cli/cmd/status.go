@@ -13,7 +13,7 @@ var statusCmd = &cobra.Command{
 	Short: "Affiche l'état de Hand Mouse OS",
 	Long:  `Vérifie si Hand Mouse OS est en cours d'exécution et affiche les informations système.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("📊 État de Hand Mouse OS\n")
+		fmt.Println("📊 État de Hand Mouse OS")
 
 		// Vérifier si le processus est en cours
 		checkCmd := exec.Command("pgrep", "-f", "Hand_mouseOS")
@@ -27,7 +27,8 @@ var statusCmd = &cobra.Command{
 		}
 
 		// Vérifier les dépendances système
-		fmt.Println("\n🔍 Vérification des dépendances:")
+		fmt.Println()
+		fmt.Println("🔍 Vérification des dépendances:")
 		checkDependency("Python", "python3", "--version")
 		checkDependency("Caméra", "v4l2-ctl", "--list-devices")
 		checkDependency("uinput", "test", "-w", "/dev/uinput")
