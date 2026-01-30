@@ -21,13 +21,18 @@ from src.virtual_keyboard import VirtualKeyboard # PHASE 8
 from src.asl_manager import ASLManager # REFACTOR: OOP
 
 class HandEngine:
-    def __init__(self, headless=False):
+    def __init__(self, headless=False, inference_width=320, inference_height=240):
         self.headless = headless
         self.cap = None
         self.camera_index = 0  # NEW: Configurable camera index
         self.is_processing = False # Manual start required
         self.running = True # Thread life flag
-        print("DEBUG: Engine initialized. Waiting for start command...")
+        
+        # OPTIMIZATION: Inference resolution (smaller = faster)
+        self.inference_width = inference_width
+        self.inference_height = inference_height
+        
+        print(f"DEBUG: Engine initialized. Inference resolution: {inference_width}x{inference_height}")
         
         self.mouse = MouseDriver()
         self.filter = HybridMouseFilter() # NEW: Initialize Filter
@@ -446,7 +451,10 @@ class HandEngine:
 
                     # 1. Flip & Convert
                     img = cv2.flip(img, 1)
-                    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                    
+                    # OPTIMIZATION: Resize for inference (keep original for display)
+                    img_inference = cv2.resize(img, (self.inference_width, self.inference_height))
+                    img_rgb = cv2.cvtColor(img_inference, cv2.COLOR_BGR2RGB)
                     mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_rgb)
                     
                     # 2. Detect Async
