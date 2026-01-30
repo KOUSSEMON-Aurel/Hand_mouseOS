@@ -12,6 +12,9 @@ use pyo3::prelude::*;
 mod geometry;
 mod filters;
 
+// Import new SIMD filter
+use filters::simd_filter::BatchOneEuroFilter;
+
 use geometry::{
     distance_2d, distance_3d, angle_between_points,
     fingers_extended, palm_center, batch_distances, pinch_distance
@@ -33,6 +36,7 @@ fn rust_core(_py: Python, m: &PyModule) -> PyResult<()> {
     // Filtres
     m.add_class::<OneEuroFilter>()?;
     m.add_class::<OneEuroFilter2D>()?;
+    m.add_class::<BatchOneEuroFilter>()?; // SIMD batch filter
     
     Ok(())
 }

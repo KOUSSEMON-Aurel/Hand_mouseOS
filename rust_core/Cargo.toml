@@ -10,8 +10,13 @@ crate-type = ["cdylib"]
 
 [dependencies]
 pyo3 = { version = "0.20", features = ["extension-module"] }
+numpy = "0.20"  # Zero-copy NumPy array access
+
 
 [profile.release]
 opt-level = 3
 lto = true
 codegen-units = 1
+# Enable SIMD auto-vectorization for the target CPU
+# rustflags are set via RUSTFLAGS env var: -C target-cpu=native
+
