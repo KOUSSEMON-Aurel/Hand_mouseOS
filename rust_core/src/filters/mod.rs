@@ -3,6 +3,8 @@
 //! Implémentation Rust du filtre One-Euro pour un lissage
 //! ultra-performant du curseur souris.
 
+pub mod simd_filter;
+
 use pyo3::prelude::*;
 use std::f32::consts::PI;
 
