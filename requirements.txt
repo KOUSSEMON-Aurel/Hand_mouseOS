@@ -1,0 +1,10 @@
+opencv-python
+mediapipe
+pyautogui
+flet
+numpy
+screeninfo
+pynput
+Pillow
+pytest
+pytest-mock
