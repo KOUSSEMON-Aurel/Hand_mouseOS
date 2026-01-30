@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HandMouseOS - Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="glass-container">
+        <header>
+            <h1>HandMouseOS <span class="badge">Live</span></h1>
+            <p>Système de contrôle gestuel par IA</p>
+        </header>
+
+        <main>
+            <section class="stats-grid">
+                <div class="stat-card">
+                    <h3>CPU Usage</h3>
+                    <div class="value" id="cpu-value">--%</div>
+                    <div class="progress-bar">
+                        <div class="fill" style="width: 45%"></div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <h3>Hand FPS</h3>
+                    <div class="value" id="fps-value">30</div>
+                    <p>Stable</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Active Gesture</h3>
+                    <div class="value" id="gesture-value">None</div>
+                    <p id="gesture-action">Ready</p>
+                </div>
+            </section>
+
+            <section class="log-console">
+                <h3>Système Logs</h3>
+                <div id="logs" class="logs">
+                    <p class="log-entry">[INFO] Initialisation du moteur Rust...</p>
+                    <p class="log-entry">[OK] Driver uinput chargé.</p>
+                    <p class="log-entry">[INFO] Caméra 0 active à 640x480.</p>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 HandMouseOS Project - Built with Rust, Python & Web</p>
+        </footer>
+    </div>
+    <script src="app.js"></script>
+</body>
+
+</html>
