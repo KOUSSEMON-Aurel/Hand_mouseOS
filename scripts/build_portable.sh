@@ -14,7 +14,7 @@ echo -e "${BLUE}=== Hand Mouse OS Independent Portable Build ===${NC}"
 
 # Dossier de sortie
 DIST_ROOT="dist"
-rm -rf "$DIST_ROOT"
+rm -rf "$DIST_ROOT" build/
 mkdir -p "$DIST_ROOT/linux"
 mkdir -p "$DIST_ROOT/windows"
 
