@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/KOUSSEMON-Aurel/Hand_mouseOS/cli/ipc"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -56,14 +57,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 
 	case tickMsg:
-		// Simuler des données (à remplacer par de vraies données IPC)
-		m.fps = 60 + (int(time.Now().Unix()) % 10)
-
-		gestures := []string{"Poing fermé", "Main ouverte", "Index pointé", "Pincement"}
-		m.gestureName = gestures[int(time.Now().Unix()/2)%len(gestures)]
-
-		m.cameraStatus = "✅ Actif"
-		m.engineStatus = "✅ En cours"
+		// Récupérer les vraies données via IPC
+		resp, err := ipc.GetStatus()
+		if err == nil && resp.Status == "ok" {
+			// Données réelles de l'engine
+			if fps, ok := resp.Data["fps"].(float64); ok {
+				m.fps = int(fps)
+			}
+			if aslEnabled, ok := resp.Data["asl_enabled"].(bool); ok {
+				if aslEnabled {
+					m.gestureName = "Mode ASL actif"
+				} else {
+					m.gestureName = "Mode gestes standard"
+				}
+			}
+			if isProcessing, ok := resp.Data["is_processing"].(bool); ok {
+				if isProcessing {
+					m.engineStatus = "✅ En cours"
+				} else {
+					m.engineStatus = "⏸️  En pause"
+				}
+			}
+			m.cameraStatus = "✅ Actif"
+		} else {
+			// Engine non disponible
+			m.cameraStatus = "❌ Déconnecté"
+			m.engineStatus = "❌ Arrêté"
+			m.gestureName = "N/A"
+			m.fps = 0
+		}
 
 		return m, tickCmd()
 	}
