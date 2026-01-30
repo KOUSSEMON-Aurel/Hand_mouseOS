@@ -1,5 +1,6 @@
 import flet as ft
 import threading
+import subprocess
 import time
 import json
 import os
@@ -386,6 +387,51 @@ class AppGUI:
         """Active/Désactive la reconnaissance ASL."""
         self.engine.asl_enabled = e.control.value
         print(f"🤟 ASL: {'ACTIVÉ' if e.control.value else 'DÉSACTIVÉ'}")
+
+    def run_setup_webcam(self):
+        """Lance l'installation de DroidCam via le CLI Go."""
+        def run():
+            # Afficher un message de début
+            self.page.snack_bar = ft.SnackBar(
+                content=ft.Text("🚀 Préparation de l'installation de DroidCam..."),
+                bgcolor=ft.Colors.BLUE_900
+            )
+            self.page.snack_bar.open = True
+            self.page.update()
+            
+            try:
+                # Trouver le binaire Go
+                project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+                cli_path = os.path.join(project_root, "cli", "handmouse")
+                
+                # S'assurer que le binaire existe
+                if not os.path.exists(cli_path):
+                    # Essayer de le compiler si absent
+                    os.system(f"cd {os.path.join(project_root, 'cli')} && go build -o handmouse")
+                
+                # Lancer la commande dans un terminal séparé pour que l'utilisateur voit le sudo
+                if os.name == 'posix': # Linux
+                    # On utilise x-terminal-emulator ou termite/gnome-terminal selon ce qui est dispo
+                    cmd = f"x-terminal-emulator -e {cli_path} setup webcam || gnome-terminal -- {cli_path} setup webcam || xterm -e {cli_path} setup webcam"
+                    subprocess.run(cmd, shell=True)
+                else: # Windows
+                    subprocess.run([cli_path, "setup", "webcam"], shell=True)
+                
+                self.page.snack_bar = ft.SnackBar(
+                    content=ft.Text("✅ Installation de DroidCam terminée !"),
+                    bgcolor=ft.Colors.GREEN_900
+                )
+                self.page.snack_bar.open = True
+            except Exception as e:
+                self.page.snack_bar = ft.SnackBar(
+                    content=ft.Text(f"❌ Erreur: {str(e)}"),
+                    bgcolor=ft.Colors.RED_900
+                )
+                self.page.snack_bar.open = True
+            
+            self.page.update()
+
+        threading.Thread(target=run, daemon=True).start()
 
     def build_layout(self):
         self.page.add(
