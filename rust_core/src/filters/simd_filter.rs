@@ -43,10 +43,9 @@ impl BatchOneEuroFilter {
     ///     NumPy array (21, 3) filtré
     pub fn filter_batch<'py>(
         &mut self,
-        py: Python<'py>,
         landmarks: PyReadonlyArray2<'py, f32>,
         t: f32
-    ) -> PyResult<&'py PyArray2<f32>> {
+    ) -> PyResult<Bound<'py, PyArray2<f32>>> {
         let array = landmarks.as_array();
         let shape = array.shape();
         
@@ -66,7 +65,8 @@ impl BatchOneEuroFilter {
             self.initialized = true;
             
             // Retourner une copie du array d'entrée
-            let out_array = PyArray2::from_owned_array(py, array.to_owned());
+            let py = landmarks.py();
+            let out_array = PyArray2::from_owned_array_bound(py, array.to_owned());
             return Ok(out_array);
         }
 
@@ -83,7 +83,7 @@ impl BatchOneEuroFilter {
         use numpy::ndarray::Array2;
         let array_2d = Array2::from_shape_vec((21, 3), output)
             .expect("Failed to reshape output");
-        Ok(PyArray2::from_owned_array(py, array_2d))
+        Ok(PyArray2::from_owned_array_bound(landmarks.py(), array_2d))
     }
 
     /// Reset le filtre

@@ -1,9 +1,10 @@
 opencv-python
 mediapipe
-autopy
+pyautogui
 flet
 numpy
 screeninfo
 pynput
 Pillow
-fffffffffffffffffff
+pytest
+pytest-mock

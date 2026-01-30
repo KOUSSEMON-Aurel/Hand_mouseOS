@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-const SocketPath = "/tmp/handmouse.sock"
+var SocketPath = "/tmp/handmouse.sock"
 
 // Command représente une commande IPC
 type Command struct {
