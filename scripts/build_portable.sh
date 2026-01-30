@@ -1,5 +1,5 @@
 #!/bin/bash
-# Hand Mouse OS - Independent Portable Build Script v3
+# Hand Mouse OS - Independent Portable Build Script v3.1
 # Génère des exécutables autonomes minimisant les dépendances système.
 
 set -e
@@ -34,49 +34,45 @@ cd rust_core
 export PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
 cargo build --release
 cd ..
+RUST_LIB_SRC="rust_core/target/release/librust_core.so"
+RUST_LIB_DEST="rust_core/target/release/rust_core.so"
+if [ -f "$RUST_LIB_SRC" ]; then
+    cp "$RUST_LIB_SRC" "$RUST_LIB_DEST"
+    RUST_LIB="$RUST_LIB_DEST"
+else
+    RUST_LIB="rust_core/target/release/rust_core.so"
+fi
+
+if [ ! -f "$RUST_LIB" ]; then
+    echo -e "${RED}Erreur: $RUST_LIB introuvable.${NC}"
+    exit 1
+fi
 
 # 3. Bundle Python Engine (OS actuel) via PyInstaller
-echo -e "\n${BLUE}[3/3] Bundling Python Engine (Independent Bundle)...${NC}"
+echo -e "\n${BLUE}[3/3] Bundling Python Engine...${NC}"
 if [ ! -d "venv" ]; then
     echo "  - Création du venv..."
     python3 -m venv venv
     ./venv/bin/pip install -r requirements.txt
 fi
 
+echo "  - Installing PyInstaller in venv..."
 ./venv/bin/pip install pyinstaller
 
-# Découverte du chemin librust_core.so
-RUST_LIB="rust_core/target/release/librust_core.so"
-if [ ! -f "$RUST_LIB" ]; then
-    echo -e "${RED}Erreur: $RUST_LIB introuvable.${NC}"
-    exit 1
-fi
-
 echo "  - Running PyInstaller..."
-# On utilise --onedir pour Flet car --onefile est problématique avec ses assets internes sur Linux
-# On zip ensuite pour la portabilité
 ./venv/bin/python -m PyInstaller --noconfirm --onedir --console \
     --name "handmouse-engine" \
     --add-data "assets:assets" \
     --add-data "src:src" \
     --collect-all "flet" \
     --collect-all "flet_desktop" \
+    --collect-all "mediapipe" \
+    --collect-all "cv2" \
+    --collect-all "pyautogui" \
+    --collect-all "pynput" \
+    --collect-all "evdev" \
     --add-binary "$RUST_LIB:." \
-    --hidden-import "cv2" \
-    --hidden-import "mediapipe" \
-    --hidden-import "pyautogui" \
-    --hidden-import "pynput" \
-    --hidden-import "src" \
-    --hidden-import "src.engine" \
-    --hidden-import "src.ipc_server" \
-    --hidden-import "src.mouse_driver" \
-    --hidden-import "src.advanced_filter" \
-    --hidden-import "src.gesture_classifier" \
-    --hidden-import "src.context_mode" \
-    --hidden-import "src.action_dispatcher" \
-    --hidden-import "src.feedback_overlay" \
-    --hidden-import "src.virtual_keyboard" \
-    --hidden-import "src.asl_manager" \
+    --paths "." \
     main.py
 
 # Placement final

@@ -17,14 +17,24 @@ var startCmd = &cobra.Command{
 		gui, _ := cmd.Flags().GetBool("gui")
 
 		// Trouver le binaire de l'engine (portable) ou le script (dev)
-		exePath, _ := os.Executable()
+		exePath, err := os.Executable()
+		if err != nil {
+			fmt.Printf("DEBUG: Erreur os.Executable: %v\n", err)
+			os.Exit(1)
+		}
+		exePath, _ = filepath.Abs(exePath)
 		exeDir := filepath.Dir(exePath)
+		println("DEBUG: Dossier exécutable:", exeDir)
 
 		// 1. Chercher le binaire portable dans le même dossier ou handmouse-engine/handmouse-engine
+		// En mode --onedir, l'exécutable est à l'intérieur du dossier handmouse-engine/
 		enginePath := filepath.Join(exeDir, "handmouse-engine", "handmouse-engine")
+		println("DEBUG: Test engine path 1:", enginePath)
+
 		if _, err := os.Stat(enginePath); os.IsNotExist(err) {
 			// Essayer chemin relatif direct (si mis à la racine linux/)
 			enginePath = filepath.Join(exeDir, "handmouse-engine")
+			println("DEBUG: Test engine path 2:", enginePath)
 		}
 
 		if gui {

@@ -9,7 +9,24 @@ import os
 import socket
 import json
 import base64
-import numpy as np  # PHASE 8: Required for keyboard canvas
+import numpy as np
+import sys
+
+# Helper pour les chemins en mode portable (PyInstaller)
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    
+    # En mode --onedir, les assets sont souvent dans _internal/
+    internal_path = os.path.join(base_path, "_internal", relative_path)
+    if os.path.exists(internal_path):
+        return internal_path
+        
+    return os.path.join(base_path, relative_path)
 from src.mouse_driver import MouseDriver
 from src.optimized_utils import CameraConfigurator, PerformanceProfiler
 from src.advanced_filter import HybridMouseFilter # NEW
@@ -347,7 +364,9 @@ class HandEngine:
             
             # Init options once
             print("DEBUG: Configuring MediaPipe Options...")
-            base_options_gpu = python.BaseOptions(model_asset_path='assets/hand_landmarker.task', delegate=python.BaseOptions.Delegate.GPU)
+            model_path = resource_path('assets/hand_landmarker.task')
+            print(f"DEBUG: Using model at {model_path}")
+            base_options_gpu = python.BaseOptions(model_asset_path=model_path, delegate=python.BaseOptions.Delegate.GPU)
             self.options = vision.HandLandmarkerOptions(
                 base_options=base_options_gpu,
                 running_mode=vision.RunningMode.LIVE_STREAM,
@@ -416,7 +435,8 @@ class HandEngine:
                     except Exception as e:
                         print(f"⚠️ GPU FAILED ({e}), FALLING BACK TO CPU...")
                         # Fallback to CPU options
-                        base_options_cpu = python.BaseOptions(model_asset_path='assets/hand_landmarker.task', delegate=python.BaseOptions.Delegate.CPU)
+                        model_path = resource_path('assets/hand_landmarker.task')
+                        base_options_cpu = python.BaseOptions(model_asset_path=model_path, delegate=python.BaseOptions.Delegate.CPU)
                         fallback_options = vision.HandLandmarkerOptions(
                             base_options=base_options_cpu,
                             running_mode=vision.RunningMode.LIVE_STREAM,

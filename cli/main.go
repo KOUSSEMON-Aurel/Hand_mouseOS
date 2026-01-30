@@ -5,5 +5,6 @@ import (
 )
 
 func main() {
+	println("DEBUG: handmouse CLI starting...")
 	cmd.Execute()
 }

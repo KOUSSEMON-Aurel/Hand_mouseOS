@@ -3,7 +3,7 @@ import cv2
 from src.one_euro_filter import OneEuroFilter
 
 try:
-    import hand_mouse_core
+    import rust_core
     RUST_AVAILABLE = True
 except ImportError:
     RUST_AVAILABLE = False
@@ -13,7 +13,7 @@ class HybridMouseFilter:
         self.use_rust = use_rust and RUST_AVAILABLE
         
         if self.use_rust:
-            self.rust_filter = hand_mouse_core.RustHybridFilter()
+            self.rust_filter = rust_core.OneEuroFilter2D(1.0, 0.007, 1.0)
             print("🚀 Using RUST Accelerated Filter")
         else:
             # 1. OneEuroFilter for jitter reduction in slow movements
@@ -58,7 +58,7 @@ class HybridMouseFilter:
     
     def process(self, raw_x, raw_y, timestamp_sec):
         if self.use_rust:
-            return self.rust_filter.process(float(raw_x), float(raw_y), float(timestamp_sec))
+            return self.rust_filter.filter(float(raw_x), float(raw_y), float(timestamp_sec))
 
         # Initialize if first run
         if self.last_pos is None:

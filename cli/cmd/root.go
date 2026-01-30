@@ -20,8 +20,10 @@ Utilisez vos gestes de la main pour contrôler votre curseur et effectuer des ac
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() {
+	println("DEBUG: Hand Mouse CLI - Execute initialisé")
 	err := rootCmd.Execute()
 	if err != nil {
+		fmt.Printf("DEBUG: Erreur fatale Cobra: %v\n", err)
 		os.Exit(1)
 	}
 }
