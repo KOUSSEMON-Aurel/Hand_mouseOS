@@ -123,3 +123,40 @@ pub fn pinch_distance(landmarks: Vec<(f32, f32, f32)>) -> f32 {
         index_tip.0, index_tip.1, index_tip.2
     )
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_distance_2d() {
+        assert_eq!(distance_2d(0.0, 0.0, 3.0, 4.0), 5.0);
+    }
+
+    #[test]
+    fn test_angle_between_points() {
+        // Angle droit (90 degrés)
+        let angle = angle_between_points(1.0, 0.0, 0.0, 0.0, 0.0, 1.0);
+        assert!((angle - 90.0).abs() < 1e-6);
+        
+        // Angle plat (180 degrés)
+        let angle = angle_between_points(1.0, 0.0, 0.0, 0.0, -1.0, 0.0);
+        assert!((angle - 180.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_fingers_extended() {
+        let mut landmarks = vec![(0.0, 0.0, 0.0); 21];
+        
+        // Simuler index étendu (8.y < 6.y)
+        landmarks[8].1 = 0.5;
+        landmarks[6].1 = 0.7;
+        
+        // Simuler majeur plié (12.y > 10.y)
+        landmarks[12].1 = 0.8;
+        landmarks[10].1 = 0.6;
+        
+        let result = fingers_extended(landmarks);
+        assert_eq!(result[1], 1, "Index should be extended");
+        assert_eq!(result[2], 0, "Middle should be folded");
+    }
+}

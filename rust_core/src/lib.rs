@@ -8,6 +8,8 @@
 //! Gains de performance: 5-30x vs Python pur
 
 use pyo3::prelude::*;
+use pyo3::types::PyModule;
+use pyo3::Bound;
 
 mod geometry;
 mod filters;
@@ -23,7 +25,7 @@ use filters::{OneEuroFilter, OneEuroFilter2D};
 
 /// Module Python rust_core
 #[pymodule]
-fn rust_core(_py: Python, m: &PyModule) -> PyResult<()> {
+fn rust_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Géométrie
     m.add_function(wrap_pyfunction!(distance_2d, m)?)?;
     m.add_function(wrap_pyfunction!(distance_3d, m)?)?;
