@@ -433,7 +433,7 @@ Un grand merci aux projets open-source qui rendent Hand Mouse OS possible :
 
 <div align="center">
 
-**Fait avec ❤️ et 🖐️ par [KOUSSEMON Aurel](https://github.com/KOUSSEMON-Aurel)**
+**Fait avec des projets open source : [Sign-Language-Interpreter-using-Deep-Learning](https://github.com/harshbg/Sign-Language-Interpreter-using-Deep-Learning.git) , [Mediapipe](https://github.com/google-ai-edge/mediapipe/blob/master/docs/solutions/models.md#hands) et 🖐️ par [KOUSSEMON Aurel](https://github.com/KOUSSEMON-Aurel)**
 
 ⭐ **Star ce projet si vous l'aimez !** ⭐
 
