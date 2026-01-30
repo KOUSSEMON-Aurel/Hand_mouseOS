@@ -12,3 +12,6 @@ sys.modules["mouseinfo"] = MagicMock()
 # Mock uinput pour éviter les erreurs de driver sur les runners GitHub
 mock_uinput = MagicMock()
 sys.modules["uinput"] = mock_uinput
+
+# Mock cv2 pour éviter les dépendances système GTK/QT dans le CI
+sys.modules["cv2"] = MagicMock()
