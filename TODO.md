@@ -16,6 +16,7 @@ Ces fonctionnalités sont prévues pour une phase ultérieure de développement.
 
 ## Accessibilité & Innovation
 
+- [ ] **Support macOS** : Compilation universelle (Intel + Apple Silicon) et packaging DMG.
 - [ ] **Feedback Multimodal** : Audio et haptique.
 - [ ] **Détection Contextuelle** : Adaptation automatique selon l'application au premier plan.
 - [ ] **Réalité Augmentée** : Intégration avec des lunettes AR.
