@@ -1,4 +1,4 @@
-# Forcer la détection et IGNORER les gros fichiers qui cachent les petits
+# Forcer la détection
 *.ts linguist-detectable=true
 *.glsl linguist-detectable=true
 *.c linguist-detectable=true
@@ -7,24 +7,15 @@
 *.css linguist-detectable=true
 flake.nix linguist-detectable=true
 
-# Forcer le nom des langages
+# Forcer l'identification précise
 native/*.c linguist-language=C
 native/*.h linguist-language=C
 web/dashboard/*.ts linguist-language=TypeScript
 assets/shaders/*.glsl linguist-language=GLSL
+flake.nix linguist-language=Nix
 
-# Marquer comme "vendored" pour qu'ils soient TOTALEMENT ignorés des calculs
+# On ne garde "vendored" que pour les fichiers qui ne sont VRAIMENT pas du code
 assets/hand_landmarker.task linguist-vendored
 package-lock.json linguist-vendored
 cli/go.sum linguist-vendored
 Cargo.lock linguist-vendored
-Makefile linguist-vendored
-Taskfile.yml linguist-vendored
-Justfile linguist-vendored
-requirements.txt linguist-vendored
-setup_uinput.sh linguist-vendored
-master_run.sh linguist-vendored
-
-# Ignorer aussi les fichiers de benchmark qui sont du Python "doc"
-benchmark_resolution.py linguist-vendored
-test_mp_gpu.py linguist-vendored
