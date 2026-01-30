@@ -1,4 +1,4 @@
-# Forcer la détection des langages spécifiques
+# Forcer la détection et IGNORER les gros fichiers qui cachent les petits
 *.ts linguist-detectable=true
 *.glsl linguist-detectable=true
 *.c linguist-detectable=true
@@ -7,21 +7,24 @@
 *.css linguist-detectable=true
 flake.nix linguist-detectable=true
 
-# Marquer les dépendances et fichiers générés comme "vendored" (ignorés des stats)
+# Forcer le nom des langages
+native/*.c linguist-language=C
+native/*.h linguist-language=C
+web/dashboard/*.ts linguist-language=TypeScript
+assets/shaders/*.glsl linguist-language=GLSL
+
+# Marquer comme "vendored" pour qu'ils soient TOTALEMENT ignorés des calculs
 assets/hand_landmarker.task linguist-vendored
 package-lock.json linguist-vendored
 cli/go.sum linguist-vendored
 Cargo.lock linguist-vendored
+Makefile linguist-vendored
+Taskfile.yml linguist-vendored
+Justfile linguist-vendored
+requirements.txt linguist-vendored
+setup_uinput.sh linguist-vendored
+master_run.sh linguist-vendored
 
-# Marquer les outils de build comme documentation pour ne pas polluer les stats
-Makefile linguist-documentation
-Taskfile.yml linguist-documentation
-Justfile linguist-documentation
-setup_uinput.sh linguist-documentation
-master_run.sh linguist-documentation
-
-# Ignorer les dossiers de build s'ils sont présents
-build/* linguist-vendored
-dist/* linguist-vendored
-rust_core/target/* linguist-vendored
-venv/* linguist-vendored
+# Ignorer aussi les fichiers de benchmark qui sont du Python "doc"
+benchmark_resolution.py linguist-vendored
+test_mp_gpu.py linguist-vendored
