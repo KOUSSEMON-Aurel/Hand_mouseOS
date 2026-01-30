@@ -1,6 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, patch
-from src.engine import HandEngine
+from unittest.mock import patch
 
 @pytest.fixture
 def mock_engine():
@@ -16,6 +15,7 @@ def mock_engine():
          patch('src.engine.PerformanceProfiler'), \
          patch('cv2.VideoCapture'):
         
+        from src.engine import HandEngine
         engine = HandEngine(headless=True)
         # On empêche le thread de tourner réellement pour les tests unitaires simples
         engine.running = False 
