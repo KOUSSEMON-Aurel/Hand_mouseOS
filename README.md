@@ -4,154 +4,82 @@
 
 Hand Mouse OS est un système de contrôle gestuel avancé qui transforme votre webcam en interface de contrôle. Déplacez le curseur, cliquez, et exécutez des actions complexes simplement avec vos mains.
 
-![Version](https://img.shields.io/badge/version-2.1-blue)
+![Version](https://img.shields.io/badge/version-3.0-blue)
 ![Python](https://img.shields.io/badge/python-3.10+-green)
+![Go](https://img.shields.io/badge/go-1.21+-00ADD8)
+![Rust](https://img.shields.io/badge/rust-1.70+-orange)
 ![License](https://img.shields.io/badge/license-MIT-orange)
 
 ---
 
 ## ✨ Fonctionnalités
 
-- 🎯 **Contrôle de souris haute précision** avec filtrage Rust ultra-rapide (0.0006ms)
+- 🎯 **Contrôle de souris haute précision** avec filtrage SIMD Rust (11.4x plus rapide)
 - 🖐️ **Détection multi-mains** (2 mains simultanées)
-- 🎨 **Interface futuriste** avec dashboard Flet
-- 🧠 **Reconnaissance de gestes** (Paume ouverte, Poing, Pointage, Peace)
+- 🎨 **Double interface** : GUI Flet + CLI Go professionnel
+- 🧠 **Reconnaissance ASL** (American Sign Language)
 - ⚡ **GPU/CPU automatique** avec fallback intelligent
 - 📹 **Flux vidéo AR temps réel** avec overlay squelettique
+- 🖥️ **Mode headless** pour serveurs et environnements sans GUI
 
 ---
 
-## 📋 Prérequis
-
-### Linux (Ubuntu/Debian)
+## 🚀 Installation Rapide
 
 ```bash
-sudo apt update
-sudo apt install -y python3.10 python3-pip python3-venv
-sudo apt install -y libgtk-3-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
-sudo apt install -y v4l-utils  # Pour la webcam
-```
-
-### Windows
-
-1. **Python 3.10+** : [Télécharger ici](https://www.python.org/downloads/)
-2. **Microsoft Visual C++ Redistributable** : [Télécharger ici](https://aka.ms/vs/17/release/vc_redist.x64.exe)
-3. **Webcam compatible** (intégrée ou USB)
-
----
-
-## 🚀 Installation
-
-### 1. Cloner le projet
-
-```bash
-git clone https://github.com/votre-username/Hand_mouseOS.git
+git clone https://github.com/KOUSSEMON-Aurel/Hand_mouseOS.git
 cd Hand_mouseOS
-```
 
-### 2. Créer l'environnement virtuel
-
-```bash
+# Python
 python3 -m venv venv
-```
-
-### 3. Activer l'environnement
-
-**Linux/macOS :**
-
-```bash
 source venv/bin/activate
-```
-
-**Windows (PowerShell) :**
-
-```powershell
-.\venv\Scripts\Activate.ps1
-```
-
-**Windows (CMD) :**
-
-```cmd
-venv\Scripts\activate.bat
-```
-
-### 4. Installer les dépendances
-
-```bash
-pip install --upgrade pip
 pip install -r requirements.txt
-```
 
-### 5. Compiler la bibliothèque Rust (Optionnel mais recommandé)
+# Rust (optionnel mais recommandé)
+cd rust_core && maturin develop --release && cd ..
 
-```bash
-cd hand_mouse_core
-cargo build --release
-maturin develop --release
-cd ..
+# CLI Go
+cd cli && go build -o handmouse && cd ..
 ```
 
 ---
 
-## 🎮 Lancement
+## 🎮 Utilisation
 
-### Linux
-
-```bash
-chmod +x master_run.sh
-./master_run.sh
-```
-
-> **Note** : Le script configure automatiquement les permissions `uinput` pour un contrôle souris au niveau kernel.
-
-### Windows
-
-```powershell
-python main.py
-```
-
----
-
-## 🎯 Utilisation
-
-1. **Lancez l'application** (voir section ci-dessus)
-2. **Interface Dashboard** : Une fenêtre Flet s'ouvre
-3. **Cliquez sur "Start System"** : La détection démarre
-4. **Contrôlez avec vos mains** :
-   - **Index levé** : Déplace le curseur
-   - **Index + Pouce rapprochés** : Clic gauche
-   - **Paume ouverte** : Mode Pilotage (curseur suit l'index)
-   - **Poing** : Clic maintenu ou scroll
-
-5. **Paramètres** : Ajustez la sensibilité dans l'onglet "Paramètres"
-
----
-
-## 🛠️ Configuration Avancée
-
-### Permissions Linux (Manuel)
-
-Si `master_run.sh` ne fonctionne pas automatiquement :
+### Mode GUI (Interface Graphique)
 
 ```bash
-sudo modprobe uinput
-sudo chmod 666 /dev/uinput
+./cli/handmouse start --gui
 ```
 
-Pour rendre permanent :
+### Mode CLI (Headless)
 
 ```bash
-echo "uinput" | sudo tee /etc/modules-load.d/uinput.conf
-echo 'KERNEL=="uinput", MODE="0666"' | sudo tee /etc/udev/rules.d/99-uinput.rules
+# Lancer l'engine seul
+./cli/handmouse run
+
+# Lancer sans vidéo (serveur)
+./cli/handmouse run --headless
+
+# Monitorer en temps réel
+./cli/handmouse dash
+
+# Configurer
+./cli/handmouse config set asl true
 ```
 
-### Changer de caméra
+### Commandes Disponibles
 
-Si votre webcam n'est pas détectée automatiquement, éditez `src/engine.py` ligne 174 :
+| Commande | Description |
+|----------|-------------|
+| `start` | Lance l'interface GUI Flet |
+| `run` | Lance l'engine headless (avec/sans vidéo) |
+| `stop` | Arrête tous les processus |
+| `status` | Affiche l'état du système |
+| `dash` | Dashboard interactif (TUI) |
+| `config` | Gère la configuration en temps réel |
 
-```python
-for cam_idx in range(5):  # Augmentez si vous avez plus de caméras
-```
+Pour plus de détails : `./cli/handmouse --help`
 
 ---
 
@@ -159,54 +87,43 @@ for cam_idx in range(5):  # Augmentez si vous avez plus de caméras
 
 ```
 Hand_mouseOS/
-├── assets/                  # Modèles IA (MediaPipe)
-├── gui/                     # Ancienne tentative Svelte (non utilisée)
-├── hand_mouse_core/         # Filtrage Rust haute performance
-├── src/                     # Code source Python
-│   ├── engine.py           # Moteur IA principal
-│   ├── gui.py              # Interface Flet
-│   ├── mouse_driver.py     # Contrôle souris (uinput/PyAutoGUI)
-│   ├── advanced_filter.py  # Filtres de lissage
-│   └── gesture_classifier.py  # Reconnaissance de gestes
-├── main.py                  # Point d'entrée
-├── master_run.sh            # Lanceur Linux
-└── requirements.txt         # Dépendances Python
+├── cli/                     # CLI Go (Cobra + Bubble Tea)
+│   ├── cmd/                # Commandes (start, run, config, etc.)
+│   ├── tui/                # Dashboard interactif
+│   └── ipc/                # Communication Go ↔ Python
+├── rust_core/              # Filtrage SIMD haute performance
+│   └── src/filters/        # OneEuro filter avec AVX2
+├── src/                    # Code source Python
+│   ├── engine.py          # Moteur IA principal
+│   ├── gui.py             # Interface Flet
+│   ├── headless_runner.py # Mode CLI standalone
+│   ├── ipc_server.py      # Serveur IPC
+│   └── mouse_driver.py    # Contrôle souris (uinput)
+└── main.py                # Point d'entrée GUI
 ```
 
 ---
 
-## 🐛 Dépannage
+## 🛠️ Technologies
 
-### Linux : "No working camera found"
-
-```bash
-ls /dev/video*  # Vérifiez que votre webcam est détectée
-v4l2-ctl --list-devices  # Listez les périphériques vidéo
-```
-
-### Windows : Erreur DLL MediaPipe
-
-Installez Visual C++ Redistributable (voir Prérequis).
-
-### Interface Flet ne s'ouvre pas
-
-```bash
-pip install --upgrade flet
-```
-
-### Latence élevée
-
-Activez le mode GPU dans les paramètres (si compatible).
+- **Python** : Engine IA et interface
+- **Rust** : Filtrage SIMD (AVX2) pour performance maximale
+- **Go** : CLI professionnel et TUI
+- **MediaPipe** : Détection de mains
+- **Flet** : Interface graphique
+- **Bubble Tea** : Dashboard terminal
 
 ---
 
 ## 📝 Roadmap
 
-- [ ] Reconnaissance de signes (alphabet)
+- [x] CLI Go avec Cobra
+- [x] Mode headless
+- [x] Dashboard TUI temps réel
+- [x] Filtrage SIMD Rust (11.4x speedup)
+- [ ] Cross-compilation binaire (Windows/Mac)
 - [ ] Clavier virtuel gestuel
-- [ ] Support macOS natif
 - [ ] Gestes personnalisables
-- [ ] Mode multi-écrans
 
 ---
 
@@ -226,4 +143,5 @@ MIT License - Voir le fichier `LICENSE` pour plus de détails.
 
 - **MediaPipe** (Google) pour la détection de mains
 - **Flet** pour le framework GUI Python
-- **PyAutoGUI** et **python-uinput** pour le contrôle souris
+- **Charm** (Bubble Tea) pour la TUI Go
+- **PyO3** pour l'intégration Rust-Python
