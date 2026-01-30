@@ -9,6 +9,11 @@ sys.modules["pyautogui"] = mock_pyautogui
 # Mock mouseinfo car pyautogui l'importe en interne
 sys.modules["mouseinfo"] = MagicMock()
 
+# Mock pynput car il nécessite un serveur X au moment de l'import
+sys.modules["pynput"] = MagicMock()
+sys.modules["pynput.keyboard"] = MagicMock()
+sys.modules["pynput.mouse"] = MagicMock()
+
 # Mock uinput pour éviter les erreurs de driver sur les runners GitHub
 mock_uinput = MagicMock()
 sys.modules["uinput"] = mock_uinput
