@@ -541,6 +541,7 @@ class HandEngine:
                         keyboard_canvas = self.virtual_keyboard.draw(np.zeros((480, 960, 3), dtype=np.uint8))
                         # Create window without toolbar
                         cv2.namedWindow("Virtual Keyboard", cv2.WINDOW_GUI_NORMAL)
+                    if not self.headless:
                         cv2.imshow("Virtual Keyboard", keyboard_canvas)
                     else:
                         # Close keyboard window if it exists
@@ -560,6 +561,7 @@ class HandEngine:
                         
                         # Combine horizontally: [Video 533x400] + [Skeleton 600x400] = 1133x400
                         combined = np.hstack([video_resized, skel_img])
+                    if not self.headless:
                         cv2.imshow("Hand Mouse AI - Unified View", combined)
                     
                     self.profiler.mark('end')

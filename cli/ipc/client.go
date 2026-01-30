@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"time"
 )
 
 const SocketPath = "/tmp/handmouse.sock"
@@ -21,12 +22,22 @@ type Response struct {
 	Data    map[string]interface{} `json:"data,omitempty"`
 }
 
-// SendCommand envoie une commande à l'engine via IPC
+// SendCommand envoie une commande à l'engine via IPC avec retry si nécessaire
 func SendCommand(cmd Command) (*Response, error) {
-	// Connexion au socket
-	conn, err := net.Dial("unix", SocketPath)
+	var conn net.Conn
+	var err error
+
+	// Tentatives de connexion (retry pendant 5 secondes)
+	for i := 0; i < 10; i++ {
+		conn, err = net.Dial("unix", SocketPath)
+		if err == nil {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+
 	if err != nil {
-		return nil, fmt.Errorf("impossible de se connecter à l'engine: %w", err)
+		return nil, fmt.Errorf("impossible de se connecter à l'engine (socket non trouvé après 5s): %w", err)
 	}
 	defer conn.Close()
 

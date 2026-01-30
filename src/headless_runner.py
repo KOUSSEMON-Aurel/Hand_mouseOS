@@ -7,11 +7,13 @@ import signal
 import time
 from pathlib import Path
 
-# Ajouter le répertoire src au path
-sys.path.insert(0, str(Path(__file__).parent))
+# Ajouter le répertoire racine au path pour les imports src.xxx
+root_dir = Path(__file__).parent.parent
+if str(root_dir) not in sys.path:
+    sys.path.insert(0, str(root_dir))
 
-from engine import HandEngine
-from ipc_server import IPCServer
+from src.engine import HandEngine
+from src.ipc_server import IPCServer
 
 
 class HeadlessRunner:
@@ -40,8 +42,8 @@ class HeadlessRunner:
         print("🚀 Hand Mouse OS - Mode Headless")
         print(f"📹 Vidéo: {'Activée' if self.show_video else 'Désactivée'}")
         
-        # Créer l'engine
-        self.engine = HandEngine()
+        # Créer l'engine avec le flag headless approprié
+        self.engine = HandEngine(headless=not self.show_video)
         
         # Démarrer le serveur IPC
         self.ipc_server = IPCServer(self.engine)
