@@ -79,9 +79,15 @@ class IPCServer:
                 "data": {
                     "is_processing": self.engine.is_processing,
                     "asl_enabled": self.engine.asl_enabled,
-                    "fps": getattr(self.engine, 'fps', 0)
+                    "fps": getattr(self.engine, 'fps', 0),
+                    "camera_index": getattr(self.engine, 'camera_index', 0)
                 }
             }
+        
+        elif cmd_type == "set_camera":
+            value = int(command.get("value", 0))
+            new_idx = self.engine.set_camera(value)
+            return {"status": "ok", "camera_index": new_idx}
         
         elif cmd_type == "toggle_asl":
             self.engine.asl_enabled = not self.engine.asl_enabled

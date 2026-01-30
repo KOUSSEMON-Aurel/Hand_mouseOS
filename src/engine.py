@@ -24,6 +24,7 @@ class HandEngine:
     def __init__(self, headless=False):
         self.headless = headless
         self.cap = None
+        self.camera_index = 0  # NEW: Configurable camera index
         self.is_processing = False # Manual start required
         self.running = True # Thread life flag
         print("DEBUG: Engine initialized. Waiting for start command...")
@@ -79,6 +80,16 @@ class HandEngine:
     @asl_enabled.setter
     def asl_enabled(self, value):
         self.asl_manager.set_enabled(value)
+
+    def set_camera(self, index):
+        """Change l'index de la caméra et redémarre la capture si nécessaire."""
+        if self.camera_index != index:
+            print(f"🔄 Switching camera from {self.camera_index} to {index}...")
+            self.camera_index = index
+            if self.cap is not None:
+                self.cap.release()
+                self.cap = None # This will trigger re-initialization in _run_loop
+        return self.camera_index
 
     def result_callback(self, result: vision.HandLandmarkerResult, output_image: mp.Image, timestamp_ms: int):
         # Only process if we are actually "processing" (avoid backlog callbacks)
@@ -359,9 +370,13 @@ class HandEngine:
                 # ACTIVE STATE: Initialize if needed
                 if self.cap is None:
                     print("DEBUG: Initializing Camera and Engine...")
-                    # Auto-detect camera
+                    # Auto-detect camera (or use configured index)
                     self.cap = None
-                    for cam_idx in range(2):
+                    
+                    # Try specific index first, then fallback to others if needed
+                    test_indices = [self.camera_index] + [i for i in range(5) if i != self.camera_index]
+                    
+                    for cam_idx in test_indices:
                         print(f"📷 Testing camera index {cam_idx} with V4L2...")
                         temp_cap = cv2.VideoCapture(cam_idx, cv2.CAP_V4L2)
                         if temp_cap.isOpened():

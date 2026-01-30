@@ -71,3 +71,8 @@ func ToggleASL() (*Response, error) {
 func SetASL(enabled bool) (*Response, error) {
 	return SendCommand(Command{Command: "set_asl", Value: enabled})
 }
+
+// SetCamera définit l'index de la caméra
+func SetCamera(index int) (*Response, error) {
+	return SendCommand(Command{Command: "set_camera", Value: index})
+}

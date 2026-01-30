@@ -35,6 +35,19 @@ var configSetCmd = &cobra.Command{
 			} else {
 				fmt.Fprintf(os.Stderr, "❌ %s\n", resp.Message)
 			}
+		case "camera":
+			var index int
+			fmt.Sscanf(value, "%d", &index)
+			resp, err := ipc.SetCamera(index)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "❌ Erreur: %v\n", err)
+				os.Exit(1)
+			}
+			if resp.Status == "ok" {
+				fmt.Printf("✅ Camera: %v\n", index)
+			} else {
+				fmt.Fprintf(os.Stderr, "❌ %s\n", resp.Message)
+			}
 		default:
 			fmt.Fprintf(os.Stderr, "❌ Clé inconnue: %s\n", key)
 			os.Exit(1)
@@ -65,6 +78,8 @@ var configGetCmd = &cobra.Command{
 			fmt.Printf("ASL: %v\n", resp.Data["asl_enabled"])
 		case "status":
 			fmt.Printf("Processing: %v\n", resp.Data["is_processing"])
+		case "camera":
+			fmt.Printf("Camera: %v\n", resp.Data["camera_index"])
 		default:
 			fmt.Fprintf(os.Stderr, "❌ Clé inconnue: %s\n", key)
 			os.Exit(1)
