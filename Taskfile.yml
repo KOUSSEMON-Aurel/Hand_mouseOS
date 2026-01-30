@@ -1,0 +1,154 @@
+version: '3'
+
+vars:
+  VENV_DIR: venv
+  PYTHON: "{{.VENV_DIR}}/bin/python"
+  PIP: "{{.VENV_DIR}}/bin/pip"
+  CLI_BIN: cli/handmouse
+
+tasks:
+  # ============================================================================
+  # Setup & Installation
+  # ============================================================================
+  
+  setup:
+    desc: "Installation complète du projet (Python, Rust, Go)"
+    cmds:
+      - task: setup:python
+      - task: build
+    silent: false
+
+  setup:python:
+    desc: "Crée le venv Python et installe les dépendances"
+    cmds:
+      - python3 -m venv {{.VENV_DIR}}
+      - "{{.PIP}} install --upgrade pip"
+      - "{{.PIP}} install -r requirements.txt"
+    status:
+      - test -d {{.VENV_DIR}}
+      - test -f {{.VENV_DIR}}/bin/activate
+
+  setup:uinput:
+    desc: "Configure les permissions uinput (nécessite sudo)"
+    cmds:
+      - sudo modprobe uinput
+      - sudo chmod 666 /dev/uinput
+      - echo "✅ uinput configuré"
+
+  # ============================================================================
+  # Build
+  # ============================================================================
+
+  build:
+    desc: "Build complet (Rust + Go)"
+    cmds:
+      - make all
+    silent: false
+
+  build:rust:
+    desc: "Build Rust core uniquement"
+    cmds:
+      - make rust
+
+  build:go:
+    desc: "Build Go CLI uniquement"
+    cmds:
+      - make go
+
+  # ============================================================================
+  # Run
+  # ============================================================================
+
+  run:
+    desc: "Lance l'application GUI (Flet)"
+    deps: [setup:uinput]
+    cmds:
+      - bash master_run.sh
+    silent: false
+
+  run:headless:
+    desc: "Lance l'engine en mode headless (sans GUI)"
+    deps: [build:go]
+    cmds:
+      - ./{{.CLI_BIN}} run --headless
+
+  run:cli:
+    desc: "Lance l'engine avec fenêtre OpenCV"
+    deps: [build:go]
+    cmds:
+      - ./{{.CLI_BIN}} run
+
+  dash:
+    desc: "Ouvre le dashboard TUI"
+    deps: [build:go]
+    cmds:
+      - ./{{.CLI_BIN}} dash
+
+  # ============================================================================
+  # CLI Commands
+  # ============================================================================
+
+  start:
+    desc: "Démarre Hand Mouse OS (GUI)"
+    deps: [build:go]
+    cmds:
+      - ./{{.CLI_BIN}} start --gui
+
+  stop:
+    desc: "Arrête Hand Mouse OS"
+    deps: [build:go]
+    cmds:
+      - ./{{.CLI_BIN}} stop
+
+  status:
+    desc: "Affiche le statut de l'engine"
+    deps: [build:go]
+    cmds:
+      - ./{{.CLI_BIN}} status
+
+  # ============================================================================
+  # Development
+  # ============================================================================
+
+  dev:
+    desc: "Mode développement avec rechargement automatique"
+    deps: [setup:uinput]
+    cmds:
+      - PYTHONPATH=. {{.PYTHON}} main.py
+
+  test:
+    desc: "Lance les tests Python"
+    cmds:
+      - "{{.PYTHON}} -m pytest tests/ -v"
+
+  lint:
+    desc: "Vérifie le code Go"
+    cmds:
+      - cd cli && go vet ./...
+      - cd cli && go fmt ./...
+
+  # ============================================================================
+  # Webcam Setup
+  # ============================================================================
+
+  setup:webcam:
+    desc: "Installe DroidCam pour utiliser le téléphone comme webcam"
+    deps: [build:go]
+    cmds:
+      - ./{{.CLI_BIN}} setup webcam
+
+  # ============================================================================
+  # Clean
+  # ============================================================================
+
+  clean:
+    desc: "Nettoie tous les artefacts de build"
+    cmds:
+      - make clean
+      - rm -rf {{.VENV_DIR}}
+      - echo "✅ Nettoyage complet terminé"
+
+  clean:build:
+    desc: "Nettoie uniquement les builds (garde le venv)"
+    cmds:
+      - make clean

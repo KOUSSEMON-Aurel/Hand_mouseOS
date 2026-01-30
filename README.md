@@ -22,50 +22,73 @@ Hand Mouse OS est un système de contrôle gestuel avancé qui transforme votre 
 - 📹 **Flux vidéo AR temps réel** avec overlay squelettique
 - 🖥️ **Mode headless** pour serveurs et environnements sans GUI
 
----
+## 🚀 Installation
 
-## 🚀 Installation Rapide
+### Prérequis
+
+- Python 3.10+
+- Go 1.21+
+- Rust (dernière version stable)
+- [Task](https://taskfile.dev) (installé automatiquement si absent)
+
+### Installation Rapide
 
 ```bash
+# Clone le projet
 git clone https://github.com/KOUSSEMON-Aurel/Hand_mouseOS.git
 cd Hand_mouseOS
 
-# Python
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+# Installation complète (Python, Rust, Go)
+task setup
 
-# Rust (optionnel mais recommandé)
-cd rust_core && maturin develop --release && cd ..
-
-# CLI Go
-cd cli && go build -o handmouse && cd ..
+# Ou manuellement avec Make
+make all
 ```
-
----
 
 ## 🎮 Utilisation
 
-### Mode GUI (Interface Graphique)
+### Commandes Principales (Taskfile)
 
 ```bash
-./cli/handmouse start --gui
+# Lancer l'interface GUI
+task run
+
+# Lancer en mode headless (sans fenêtre)
+task run:headless
+
+# Dashboard TUI
+task dash
+
+# Démarrer/Arrêter l'engine
+task start
+task stop
+task status
 ```
 
-### Mode CLI (Headless)
+### Build (Makefile)
 
 ```bash
-# Lancer l'engine seul
+# Build complet
+make all
+
+# Build Rust uniquement
+make rust
+
+# Build Go CLI uniquement
+make go
+
+# Nettoyer
+make clean
+```
+
+### CLI Direct
+
+```bash
+# Après build
+./cli/handmouse --help
 ./cli/handmouse run
-
-# Lancer sans vidéo (serveur)
-./cli/handmouse run --headless
-
-# Monitorer en temps réel
-./cli/handmouse dash
-
-# Configurer
-./cli/handmouse config set asl true
+./cli/handmouse config set camera 1
+./cli/handmouse setup webcam  # Installer DroidCam
 ```
 
 ### Commandes Disponibles
